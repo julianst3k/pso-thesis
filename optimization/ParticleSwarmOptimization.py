@@ -8,9 +8,9 @@ class ParticleSwarmOptimization:
         self.particle_number = particle_number
         self.turbulence_factor = turbulence
         self.hypercube_number = hypercubes
-        self.repository = at.ArchiveTreeController([], [])
-        self.dimension = dimension
         self.hypercubes = ah.AdaptativeHypercubes(dimension,self.hypercube_number)
+        self.repository = at.ArchiveTreeController([], [], self.hypercubes)
+        self.dimension = dimension
         self.initialize_parameters()
 
     def initialize_parameters(self):
@@ -20,11 +20,14 @@ class ParticleSwarmOptimization:
         self.bfp = np.zeros((self.particle_number, len(self.parameters)))
         self.rep = np.zeros((self.particle_number, len(self.parameters)))
 
+    def initial_conditions(self, generator):
+        self.particle = generator.generate(self.particle)
+
 
     def evaluation(self, fit_function, first_iter=False):
-        evaluated_values = np.zeros(self.particle_number, fit_function.get_objectives_length())
+        evaluated_values = np.zeros((self.particle_number, fit_function.get_objective_length()))
         for i, particle in enumerate(self.particle):
-            evaluated_values[i,:] = fit_function(particle)
+            evaluated_values[i,:] = fit_function.fitness(particle)
         self.archive_controller(evaluated_values, self.get_hypercubes())
         self.gen_hypercubes()
         self.set_bests(evaluated_values, first_iter=first_iter)
@@ -42,7 +45,7 @@ class ParticleSwarmOptimization:
             particle = node.get_particle()
             self.rep[i, :] = particle
 
-    def archive_controller(self, evaluated_values):
+    def archive_controller(self, evaluated_values, hypercubes):
         archive_tree_controller = at.ArchiveTreeController(evaluated_values, self.particle)
         non_dominant_nodes = archive_tree_controller.return_non_dominant_nodes()
         self.repository.update_tree(non_dominant_nodes)
@@ -56,7 +59,7 @@ class ParticleSwarmOptimization:
                     self.bfp[i, :] = value
 
     def update_state(self):
-        self.velocidad = 0.4*self.velocidad + np.random.rand()*(self.bfp-self.particle) + np.random.rand()*(self.rep - self.particle)
+        self.velocidad = 0.4*self.velocidad + np.random.rand()*(self.bfp-self.particle) + np.random.rand()*(self.rep - self.particle)+self.turbulence_factor
         self.particle += self.velocidad
         self.check_boundaries()
 
@@ -73,6 +76,9 @@ class ParticleSwarmOptimization:
         self.velocidad += -2*self.velocidad*lb_comparison
         self.velocidad += -2*self.velocidad*ub_comparison
         self.particle += (self.lb_comp-self.particle)*lb_comparison+(self.ub_comp-self.particle)*ub_comparison
+
+    def get_bests(self):
+        return self.bfp
 
 
 class ParticleOptimizationIterator:

@@ -22,7 +22,7 @@ class AdaptativeHypercubes:
             min_val = self.get_min(i)
             try:
                 index = round((value-min_val)*self.qty/(max_val-min_val))
-            except ZeroDivisionError:
+            except OverflowError:
                 index = 5
             coordinates[i] = int(index)
         return coordinates

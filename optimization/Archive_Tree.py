@@ -40,13 +40,13 @@ class ArchiveTreeController:
         keys_sorted = sorted(keys)
         for key in keys_sorted:
             for node in node_dictionary[key]:
-                self.tree.add_value(node)
+                self.tree.add_value_node(node)
 
     def return_non_dominant_nodes(self):
         return self.tree.return_nodes()
 
     def get_hypercubes(self):
-        return self.get_hypercubes()
+        return self.hypercubes
 
 
 class ArchiveTree:
@@ -58,7 +58,7 @@ class ArchiveTree:
         self.size = 0
         self.top = top
 
-    def add_value(self, node):
+    def add_value_node(self, node):
         value = node.get_value()
         key = node.get_key()
         index = node.get_index()
@@ -96,6 +96,7 @@ class ArchiveTreeNode:
 
     def __init__(self, value, key, index, particle):
         self.key_value = value[key]
+        self.key = key
         self.value = value
         self.particle = particle
         self.index = index
