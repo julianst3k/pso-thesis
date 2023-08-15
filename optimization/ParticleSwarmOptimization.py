@@ -69,37 +69,50 @@ class ParticleSwarmOptimization:
         for param in self.parameters:
             lb_array.append(self.parameters[param]["lb"])
             ub_array.append(self.parameters[param]["ub"])
-        lb_comp = np.tile(lb_array, (self.particle_number, 1)).transpose()
-        ub_comp = np.tile(ub_array, (self.particle_number, 1)).transpose()
+        lb_comp = np.tile(lb_array, (self.particle_number, 1))
+        ub_comp = np.tile(ub_array, (self.particle_number, 1))
         lb_comparison = self.particle < lb_comp
         ub_comparison = self.particle > ub_comp
         self.velocidad += -2*self.velocidad*lb_comparison
         self.velocidad += -2*self.velocidad*ub_comparison
-        self.particle += (self.lb_comp-self.particle)*lb_comparison+(self.ub_comp-self.particle)*ub_comparison
+        self.particle += (lb_comp-self.particle)*lb_comparison+(ub_comp-self.particle)*ub_comparison
 
     def get_bests(self):
         return self.bfp
 
+    def get_particle(self):
+        return self.particle
+
+    def get_repository(self):
+        return self.get_repository()
 
 class ParticleOptimizationIterator:
 
-    def __init__(self, particle_number, dimension, parameters, turbulence, hypercubes, iters, function):
+    def __init__(self, particle_number, dimension, parameters, turbulence, hypercubes, iters, initial_function, fit_function):
         self.parameters = parameters
         self.particle_number = particle_number
         self.turbulence_factor = turbulence
         self.hypercube_number = hypercubes
         self.dimension = dimension
         self.optimizator = ParticleSwarmOptimization(particle_number, dimension, parameters, turbulence, hypercubes)
-        self.function = function
-        self.do_optimization(iters, function)
+        self.initial_function = initial_function
+        self.function = fit_function
+        self.do_optimization(iters, fit_function)
 
     def reset_optimizator(self):
         self.optimizator = ParticleSwarmOptimization(self.particle_number, self.dimension, self.parameters, self.turbulence, self.hypercubes)
 
-    def do_mopso(self, iter, function):
-        for i in range(iter):
+    def do_optimization(self, iters, function):
+        self.optimizator.initial_conditions(self.initial_function)
+        for i in range(iters):
             self.optimizator.evaluation(function)
             self.update_state()
         return
+
+    def get_optimizator(self):
+        return self.optimizator
+
+    def get_best_results(self):
+        return self.optimizator.get_repository()
 
 
