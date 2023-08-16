@@ -105,8 +105,8 @@ class ParticleOptimizationIterator:
     def do_optimization(self, iters, function):
         self.optimizator.initial_conditions(self.initial_function)
         for i in range(iters):
-            self.optimizator.evaluation(function)
-            self.update_state()
+            self.get_optimizator().evaluation(function)
+            self.get_optimizator().update_state()
         return
 
     def get_optimizator(self):

@@ -1,5 +1,10 @@
 import optimization.Archive_Tree as at
 import numpy as np
+import logging
+
+FORMAT = '%(asctime)s %(name)-12s %(message)s'
+logging.basicConfig(format=FORMAT,level=logging.WARNING,force=True)
+logger = logging.getLogger('AdaptativeHypercubes')
 
 
 class AdaptativeHypercubes:
@@ -17,29 +22,39 @@ class AdaptativeHypercubes:
     def return_index(self, values):
         dimension = len(values)
         coordinates = np.zeros(dimension, dtype=np.int32)
+        logger.info("Valor %s", values)
         for i,value in enumerate(values):
             max_val = self.get_max(i)
             min_val = self.get_min(i)
+            logger.info("Valor, Valor: %s", value)
+            logger.info("Valor, Maximo: %s, Minimo: %s", max_val, min_val)
             try:
                 index = round((value-min_val)*self.qty/(max_val-min_val))
             except OverflowError:
                 index = 5
+            except ValueError:
+                index = 5
+
             coordinates[i] = int(index)
         return coordinates
 
     def update_hyper(self, nodes):
+        logger.info("Update %s", nodes)
+
         value_array = np.empty((len(nodes),len(self.get_hypercube_params())))
         for i, node in enumerate(nodes):
             value = node.get_value()
             value_array[i,:] = value
         minimal_values = np.min(value_array, axis=0)
         maximal_values = np.max(value_array, axis=0)
+        logger.info("Value Array %s, Max: %s, Min: %s", value_array, maximal_values, minimal_values)
         for dim in self.hypercube_params:
             slack_factor = (maximal_values[dim]-minimal_values[dim])/10
             self.hypercube_params[dim]["max"] = maximal_values[dim]+slack_factor
             self.hypercube_params[dim]["min"] = minimal_values[dim]-slack_factor
 
     def hypercube_store_positions(self, nodes):
+        logger.info("Storing %s", nodes)
         self.collection_of_cubes = []
         for node in nodes:
             value = node.get_value()
@@ -76,6 +91,7 @@ class AdaptativeHypercubes:
         return self.fitness
 
     def get_max(self, dim):
+        logger.info("Maximo %s", self.get_hypercube_params()[dim]["max"])
         return self.get_hypercube_params()[dim]["max"]
 
     def get_min(self, dim):
