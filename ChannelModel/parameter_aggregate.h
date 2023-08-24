@@ -41,19 +41,33 @@ struct TransmitterParameters{
 
 struct TransmitterAggregate{
     void pushTransmitter(TransmitterParameters *transmitter){transmitters.push_back(transmitter);};
-    std::string get_head(){return std::to_string(transmitters[0]->coordinate[0]);}
+    int get_head(){
+        std::cout << (this->transmitters[0])->coordinate[1];
+        std::cout << (this->transmitters[0])->coordinate[2];
+        return (this->transmitters[0])->coordinate[0];}
     std::vector<TransmitterParameters*> transmitters;
 };
 
 struct TransmitterConfigurations{
     void pushTransmitter(TransmitterAggregate *transmitter){transmitters.push_back(transmitter);};
-    std::string get_head(){return std::to_string(transmitters[0]->transmitters[0]->coordinate[0]);}
+    std::string get_head(){return std::to_string(this->transmitters[0]->transmitters[0]->coordinate[0]);}
+
     std::vector<TransmitterAggregate*> transmitters;
 };
 
 struct ReceiverParameters{
     ReceiverParameters(float Ap, float eta, float fov, float alpha, float ele, py::array_t<float> center, py::array_t<float> coordinate) :
     Ap(Ap), eta(eta), fov(fov), alpha(alpha), ele(ele), center(make_vector_1d_numpy(center)), coordinate(make_vector_1d_numpy(coordinate)) {}
+        py::array_t<float> get_coord(){
+        float* ret = (float*)malloc(3*sizeof(float));
+        size_t  it = 0;
+        for(float e: this->coordinate){
+            ret[it] = e;
+            it++;
+        }
+
+        return py::array_t<float>({3}, {sizeof(float)}, ret);
+        };
     float r = 0.1;
     float Ap;
     float eta;
@@ -66,14 +80,14 @@ struct ReceiverParameters{
 
 struct ReceiverAggregate{
     void pushReceiver(ReceiverParameters *recv){receivers.push_back(recv);};
-    std::string get_head(){return std::to_string(receivers[0]->coordinate[0]);}
+    py::array_t<float> get_head(int i){return this->receivers[i]->get_coord();}
     std::vector<ReceiverParameters*> receivers;
 
 };
 
 struct ReceiverConfigurations{
     void pushReceiver(ReceiverAggregate *recv){receivers.push_back(recv);};
-    std::string get_head(){return std::to_string(receivers[0]->receivers[0]->coordinate[0]);}
+    py::array_t<float> get_head(int i, int j){return this->receivers[i]->receivers[j]->get_coord();}
     std::vector<ReceiverAggregate*> receivers;
 };
 

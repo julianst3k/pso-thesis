@@ -17,13 +17,13 @@ int find_index_t(py::array_t<float> arr_t, float x);
 void initialize_3d_matrix(float*** out_matrix, int size, int h, int w);
 
 void channel_subroutine(pa::WallParameters* wall, pa::TransmitterAggregate* trans, pa::ReceiverAggregate* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<std::vector<float>> matrix);
+pa::SimulationParameters* simulation, std::vector<std::vector<float>>* matrix);
 
 void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<float> final_response);
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos);
 
 void HLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<float> final_response);
+pa::SimulationParameters* simulation, std::vector<float>* final_response);
 ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float rz, float wx, float wy, float wz, float Aw, float pw, float Ap, float eta, float alphat, float alphar,
     float alphaw, float betat, float betar, float betaw, float incr, float incj, int m, float fov, float X, float Y, float t, float c);
 
@@ -46,7 +46,7 @@ int find_indexs(std::vector<float> arr, float x);
 
 int find_binary(std::vector<float> arr, int low, int high, float x);
 
-void conv(std::vector<float> final_response, float* h_vector, std::vector<float> h_led, int sz);
+void conv(std::vector<float>* final_response, float** h_vector, std::vector<float>* h_led, int sz);
 
 float led_pd_channel(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation);

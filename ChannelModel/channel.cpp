@@ -6,6 +6,8 @@
 #include <parameter_aggregate.h>
 #include <random>
 #include <channel.h>
+#include <iostream>
+#include <thread>
 
 #define pi 3.1415926535
 namespace pa = parameter_aggregate;
@@ -24,21 +26,28 @@ void initialize_3d_matrix(float*** out_matrix, int size, int h, int w){
 float led_pd_channel(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation){
     std::vector<float> final_response(simulation->time.size()+simulation->h_led.size()-1);
-    HLos_Vector(wall, trans, recv, tunnel, simulation, final_response);
-    HNLos_Vector(wall, trans, recv, tunnel, simulation, final_response);
-    HNLos_Vector(wall, trans, recv, tunnel, simulation, final_response);
-    float sum = std::reduce(std::cbegin(final_response), std::cend(final_response));
-    final_response.clear();
+    HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response);
+    HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2);
+    HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8);
+    float sum = std::reduce(final_response.begin(), final_response.end());
+
+    final_response = std::vector<float>();
     return sum;
 }
 
 
 
-void conv(std::vector<float> final_response, float* h_vector, std::vector<float> h_led, int sz){
-    for(int i=0; i<h_led.size(); i++){
+void conv(std::vector<float> *final_response, float** h_vector, std::vector<float>* h_led, int sz){
+    float sum = 0;
+    for(int i=0; i<(*h_led).size(); i++){
         for(int j=0; j<sz; j++){
-            final_response[i+j] = h_led[i]*h_vector[j];
+
+            (*final_response)[i+j] += (*h_led)[i]*(*h_vector)[j];
+            sum += (*h_led)[i]*(*h_vector)[j];
+            if((*h_vector)[j]>0 && i==0){
+            }
         }
+
     }
 }
 
@@ -72,7 +81,7 @@ int find_index(std::vector<float> arr, float x){
 }
 int find_index_t(py::array_t<float> arr_t, float x){
     int i = 1;
-    auto arr = std::vector<T>(arr_t.data(), arr_t.data()+arr_t.size());
+    auto arr = std::vector<float>(arr_t.data(), arr_t.data()+arr_t.size());
     int l = arr.size();
     while(i<l){
         if(arr[i-1]<=x && arr[i]>x){
@@ -92,22 +101,22 @@ float dot_product(std::vector<float> v1, std::vector<float> v2){
     }
     return sum;
 }
+
 float incline(float xt, float yt, float zt, float xr, float yr, float zr, float alpha, float beta){
-    std::vector<float> path = std::vector<float>{xr-xt, yr-yt, zt-zr};
+
+    std::vector<float> path = std::vector<float>{xr-xt, yr-yt, zr-zt};
     std::vector<float> vector_normal = norm_vector_recv(alpha, 90-beta);
-    std::vector<float> norm;
+    std::vector<float> norm = std::vector<float>(path.size());
     std::transform(path.begin(), path.end(), norm.begin(), [](float i)->float {return i*i;});
-    float sum = std::reduce(norm.begin(), norm.end());
-    std::transform(norm.begin(), norm.end(), norm.begin(), [sum](float i)->float {return i/sum;});
+    float sum = std::sqrt(std::reduce(norm.begin(), norm.end()));
+    std::transform(path.begin(), path.end(), norm.begin(), [sum](float i)->float {return i/sum;});
     float dp = dot_product(norm, vector_normal);
     std::transform(vector_normal.begin(), vector_normal.end(), vector_normal.begin(), [](float i)-> float {return i*0.1;});
     if(dp>0){
         return pi;
     }
-    return std::acos(dp);
-
+    return std::acos(-dp);
 }
-
 
 
 
@@ -136,7 +145,7 @@ std::vector<float> norm_vector_trans(float alpha, float beta){
 std::vector<float> norm_vector_recv(float alpha, float beta){
     float alphad = pi/180*alpha;
     float betad = pi/180*beta;
-    std::vector<float> vect{-std::cos(alphad)*std::sin(betad), -std::sin(alphad)*std::sin(betad), std::cos(betad)};
+    std::vector<float> vect{std::cos(alphad)*std::sin(betad), std::sin(alphad)*std::sin(betad), std::cos(betad)};
     return vect;
 }
 
@@ -145,12 +154,13 @@ std::vector<float> norm_vector_recv(float alpha, float beta){
 ch::loss_and_time* HLos(float tx, float ty, float tz, float rx, float ry, float rz, float Ap, float eta, float alphat, float alphar,
     float betat, float betar, float incr, float incj, int m, float fov, float X, float Y, float t, float c){
     std::vector<float> dist_vector; std::vector<float> norm_vec_t; std::vector<float> norm_vec_r;
-    std::vector<float> dist_vector_neg;
+
     float dist_vector_norm; float p1; float p2; float dm; float g;
     dist_vector = vector_distance(tx, ty, tz, rx, ry, rz);
     dist_vector_norm = std::sqrt(std::pow(tx-rx,2)+std::pow(ty-ry,2)+std::pow(tz-rz,2));
     norm_vec_t = norm_vector_trans(alphat, betat);
     p1 = dot_product(dist_vector, norm_vec_t);
+    std::vector<float> dist_vector_neg = std::vector<float>(dist_vector.size());
     std::transform(dist_vector.begin(), dist_vector.end(), dist_vector_neg.begin(), [](float i) -> float { return -i;});
     norm_vec_r = norm_vector_recv(alphar, betar);
     p2 = dot_product(dist_vector_neg, norm_vec_r);
@@ -166,12 +176,14 @@ ch::loss_and_time* HLos(float tx, float ty, float tz, float rx, float ry, float 
 ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float rz, float wx, float wy, float wz, float Aw, float pw, float Ap, float eta, float alphat, float alphar,
     float alphaw, float betat, float betar, float betaw, float incr, float incj, int m, float fov, float X, float Y, float t, float c){
     std::vector<float> dist_vector_tw; std::vector<float> norm_vec_t; std::vector<float> norm_vec_r;
-    std::vector<float> dist_vector_tw_neg; std::vector<float> dist_vector_wr; std::vector<float> dist_vector_wr_neg;
+    std::vector<float> dist_vector_wr;
     float dist_vector_norm_tw; float dist_vector_norm_wr; float p1; float p2; float p3; float p4; float dm; float g; std::vector<float> norm_vec_w;
     dist_vector_tw = vector_distance(tx, ty, tz, wx, wy, wz);
+    std::vector<float> dist_vector_tw_neg = std::vector<float>(dist_vector_tw.size());
     std::transform(dist_vector_tw.begin(), dist_vector_tw.end(), dist_vector_tw_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_tw = std::sqrt(std::pow(tx-wx,2)+std::pow(ty-wy,2)+std::pow(tz-wz,2));
     dist_vector_wr = vector_distance(wx, wy, wz, rx, ry, rz);
+    std::vector<float> dist_vector_wr_neg = std::vector<float>(dist_vector_wr.size());
     std::transform(dist_vector_wr.begin(), dist_vector_wr.end(), dist_vector_wr_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_wr = std::sqrt(std::pow(rx-wx,2)+std::pow(ry-wy,2)+std::pow(rz-wz,2));
     norm_vec_t = norm_vector_trans(alphat, betat);
@@ -186,63 +198,70 @@ ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float
 
     ch::loss_and_time* ret = new ch::loss_and_time();
     ret->loss = std::abs((m+1)*Ap*Aw*pw*p1*p2*p3*p4*g/(std::pow(dist_vector_norm_tw,4)*
-    std::pow(dist_vector_norm_wr,4)*pi*pi));
+    std::pow(dist_vector_norm_wr,4)));
     ret->time = dm;
 
     return ret;
 }
 
 void HLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<float> final_response){
-        float* h_vector;
-        h_vector = new float[simulation->time.size()];
-        float incidencia_tr = incline(trans->coordinate[0], trans->coordinate[1], trans->coordinate[2], recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
-        float incidencia_tr_rad = pi/180*incidencia_tr;
+pa::SimulationParameters* simulation, std::vector<float>* final_response){
+        float* h_vector = new float[140]();
+        memset(h_vector, 0, sizeof(h_vector));
+        float sum;
+        for(int j=0; j<140; j++){
+            sum += h_vector[j];
+        }
+        float incidencia_tr_rad = incline(trans->coordinate[0], trans->coordinate[1], trans->coordinate[2], recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
+        float incidencia_tr = 180/pi*incidencia_tr_rad;
         ch::loss_and_time* hlos = HLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],
-        recv->Ap, recv->eta, trans->alpha, recv->alpha, trans->beta, recv->ele, incidencia_tr_rad, incidencia_tr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t, simulation->c);
+        recv->Ap, recv->eta, trans->alpha, recv->alpha, trans->beta, 90-recv->ele, incidencia_tr_rad, incidencia_tr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t, simulation->c);
         int index = find_index(simulation->time, hlos->time);
         h_vector[index] = hlos->loss;
-        conv(final_response, h_vector, simulation->h_led, simulation->time.size());
-        free(h_vector);
+        conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+        delete [] h_vector;
 }
 void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<float> final_response){
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos){
         int a =1;
         float lx = tunnel->x; float ly = tunnel->y; float lz = tunnel->z;
-        int Nx = lx*3; int Ny = ly*3; int Nz = lz*3;
+        int Nx = lx*5; int Ny = ly*5; int Nz = lz*5;
         float dA = (lz*lx)/(Nx*Nz);
         for(float kk=0; kk<lx; kk+=lx/Nx){
             for(float ll=0; ll<ly; ll+=ly/Ny){
-                std::vector<float> vec = std::vector<float>{kk, 0.2, ll};
                 std::default_random_engine generator;
                 std::uniform_real_distribution<float> distribution(0.0,90);
                 float r = distribution(generator);
                 float s = distribution(generator);
                 if(std::abs(kk-recv->coordinate[0])<=1.5 && ll>=1.5){
-                    float incidencia_wr = incline(kk, 0.2, ll, recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
-                    float incidencia_wr_rad = pi/180*incidencia_wr;
-                    ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],kk,0.2,ll,recv->coordinate[0],recv->coordinate[1],recv->coordinate[2]
-        ,dA/70,wall->pw,recv->Ap, recv->eta, trans->alpha, r, recv->alpha, trans->beta, s, recv->ele, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c);
-                    float* h_vector;
-                    h_vector = new float[simulation->time.size()];
+                    float incidencia_wr_rad = incline(kk, wall_pos, ll, recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
+                    float incidencia_wr = 180.0/pi*incidencia_wr_rad;
+                    ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],kk,wall_pos,ll,recv->coordinate[0],recv->coordinate[1],recv->coordinate[2]
+        ,dA,wall->pw,recv->Ap, recv->eta, trans->alpha, r, recv->alpha, trans->beta, s, 90-recv->ele, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c);
+                    float* h_vector = new float[140]();
+                    memset(h_vector, 0, sizeof(h_vector));
                     int index = find_index(simulation->time, nhlos->time);
                     h_vector[index] = nhlos->loss;
-                    conv(final_response, h_vector, simulation->h_led, simulation->time.size());
-                    free(h_vector);
+                    conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+                    delete [] h_vector;
                 }
             }
         }
 }
 
 void channel_subroutine(pa::WallParameters* wall, pa::TransmitterAggregate* trans, pa::ReceiverAggregate* recv, pa::TunnelParameters* tunnel,
-pa::SimulationParameters* simulation, std::vector<std::vector<float>> matrix){
+pa::SimulationParameters* simulation, std::vector<std::vector<float>>* matrix){
     int i=0; int j = 0;
 
     for(auto pd: recv->receivers){
         for(auto led: trans->transmitters){
-            matrix[i][j] = led_pd_channel(wall, led, pd, tunnel, simulation);
+            std::cout << j << "\n";
+            (*matrix)[i][j] = led_pd_channel(wall, led, pd, tunnel, simulation);
+            std::cout << (*matrix)[i][j] << "\n";
             j++;
         }
+        std::cout << pd->coordinate[0] << " " << pd->coordinate[1] << " " << pd->coordinate[2] << "\n";
+        j = 0;
         i++;
     }
 }
@@ -250,13 +269,20 @@ pa::SimulationParameters* simulation, std::vector<std::vector<float>> matrix){
 py::array_t<float> channel_calculation(pa::WallParameters* wall, pa::TransmitterAggregate* tconfig, pa::ReceiverConfigurations* rconfig,
 pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation){
     const size_t size = rconfig->receivers.size();
-    std::vector<std::vector<std::vector<float>>> out_matrix(16, std::vector<std::vector<float>>(4, std::vector<float>(4)));
+    std::vector<std::vector<std::vector<float>>> out_matrix(8, std::vector<std::vector<float>>(4, std::vector<float>(4)));
+    std::vector<std::thread> thread_vec = std::vector<std::thread>(8);
     int i=0;
     for(auto recv : rconfig->receivers){
-        channel_subroutine(wall, tconfig, recv, tunnel, simulation, out_matrix[i]);
+        std::cout << i << "\n";
+        std::thread ch(channel_subroutine,wall, tconfig, recv, tunnel, simulation, &out_matrix[i]);
+        thread_vec[i] = std::move(ch);
         i++;
     }
-    float* out_matrix_flat = (float*)malloc(16*16*sizeof(float));
+    for(int k=0; k<thread_vec.size(); k++){
+        thread_vec[k].join();
+
+    }
+    float* out_matrix_flat = (float*)malloc(8*16*sizeof(float));
     int cnt = 0;
     for(int i=0; i<size; i++){
         for(int j=0; j<4; j++){
@@ -266,9 +292,12 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation){
             }
         }
     }
-    return py::array_t<float>({16,4,4}, {4*4*sizeof(float), 4*sizeof(float), sizeof(float)}, out_matrix_flat);
+    return py::array_t<float>({8,4,4}, {4*4*sizeof(float), 4*sizeof(float), sizeof(float)}, out_matrix_flat);
 
 }
+
+
+
 
 
 
