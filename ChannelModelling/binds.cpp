@@ -8,7 +8,7 @@
 namespace pa = parameter_aggregate;
 namespace py = pybind11;
 
-PYBIND11_MODULE(example, m){
+PYBIND11_MODULE(model, m){
     py::class_<pa::WallParameters>(m, "WallParameters")
     .def(py::init<float> ())
     .def("get_reflection_param", &pa::WallParameters::get_reflection_param);
@@ -43,6 +43,4 @@ PYBIND11_MODULE(example, m){
     m.def("channel_calculation", &incline);
     m.def("channel_calculation", &find_index_t);
     m.def("channel_calculation", &led_pd_channel);
-
-
 }

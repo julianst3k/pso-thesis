@@ -78,7 +78,19 @@ class TestPSO:
                     optimizer.get_optimizator().get_particle()])
 
 
+    def test_optimizer_ic_iter_final(self):
+        numero_de_particulas = 100
+        dimension = 2
+        parameters = {0: {"lb": 0, "ub": 1}, 1: {"lb":0, "ub":1}}
+        turbulence = 0.0001
+        hypercubes = 10
+        optimizer = pso.ParticleSwarmOptimization(numero_de_particulas, dimension, parameters, turbulence, hypercubes)
+        initial_function = UniformOutput([0,0], [1,1])
+        optimizer.initial_conditions(initial_function)
+        optimizer.multiprocess_evaluation(IdentityFunction(2), first_iter=True)
+        optimizer.update_state()
 
+        assert any([best[0]>0 or best[1]>0 for best in optimizer.get_bests()])
 
 
      #   params = {0: {"lb": 0, "ub":1}, 1: {"lb":0, "ub": 1}}

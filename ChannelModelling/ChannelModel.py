@@ -1,5 +1,5 @@
 import numpy as np
-import example as chb
+import ChannelModelling.build.model as chb
 
 
 class WallParameters:
@@ -98,10 +98,10 @@ class ModelSeed:
         self.Receiver_Agg = ReceiverAggregate()
         for i in range(4):
             if i == 0 or i == 3:
-                alphat = alphat_outside
+                alphat = alphat_outside*(-1)**i
             else:
-                alphat = alphat_inside
-            self.Transmitter_Agg.add_transmitter(TransmitterParameters([(i + 1), 0.5, 3], betat, 90, 60))
+                alphat = alphat_inside*(-1)**i
+            self.Transmitter_Agg.add_transmitter(TransmitterParameters([(i + 1), 0.5, 3], betat, alphat, 60))
         for j in range(4):
             self.Receiver_Agg.add_pd(ReceiverParameters(0.0001, 1.5, fov, j * 90 + 30, betar, coord_rec))
         self.wall = WallParameters(0.6)
@@ -111,7 +111,6 @@ class ModelSeed:
         self.bind_recv = []
         self.receiver_configurations = None
         self.rags = []
-        self.rotations = False
 
     def create_pybind_objects(self):
         self.wp_bind = chb.WallParameters(self.wall.pw)
@@ -140,103 +139,17 @@ class ModelSeed:
         return new_aggregate
 
     def create_pybind_rotations(self, num_rots):
-        if not self.rotations:
-            wp, tag, rag, par, tunn = self.create_pybind_objects()
-            self.receiver_configurations = chb.ReceiverConfigurations()
-            self.rags = []
+        wp, tag, rag, par, tunn = self.create_pybind_objects()
+        self.receiver_configurations = chb.ReceiverConfigurations()
+        self.rags = []
+        self.receiver_configurations.pushReceiver(rag)
+        self.rags.append(rag)
+        for i in range(1, num_rots):
+            rot = 360 / (num_rots + 1)
+            self.Receiver_Agg.rotate(rot)
+            rag = self.do_receiver_aggregate()
             self.receiver_configurations.pushReceiver(rag)
             self.rags.append(rag)
-            self.rotations = True
-            for i in range(1, num_rots):
-                rot = 360 / (num_rots + 1)
-                self.Receiver_Agg.rotate(rot)
-                rag = self.do_receiver_aggregate()
-                self.receiver_configurations.pushReceiver(rag)
-                self.rags.append(rag)
-            return wp, tag, self.receiver_configurations, par, tunn
-        else:
-            return self.wp_binds, self.tag_bind, self.receiver_configurations, self.par_bind, self.tunn_bind
-
-    def calculate_fitness(self):
-        fitness = FitnessCalculator(self)
-        fit = fitness.calculate_fitness(8)
-        return fit
+        return wp, tag, self.receiver_configurations, par, tunn
 
 
-class FitnessCalculator:
-    def __init__(self, model_seed):
-        self.model_seed = model_seed
-
-    def calculate_fitness(self, num_rot=8):
-        model = self.get_model_seed()
-        model.create_pybind_rotations(num_rot)
-        resulting_array = chb.channel_calculation(model.wp_bind, model.tag_bind, model.receiver_configurations,
-                                                  model.tunn_bind, model.par_bind)
-        fitness = self.calculate_non_dominant(resulting_array, 1e-7)
-        return fitness
-
-    def get_model_seed(self):
-        return self.model_seed
-
-    def calculate_non_dominant(self, input_array, noise):
-        solutions = []
-        print(input_array)
-        for matrix in input_array:
-            h_one = matrix[0, :] + matrix[3, :]
-            h_two = matrix[1, :] + matrix[2, :]
-            sinr_one = [(h1 / (h_two[i] + noise), h_two[i] / (h1 + noise)) for i, h1 in enumerate(h_one)]
-            queue = SolQueue()
-            for i, tp in enumerate(sinr_one):
-                queue.add_value(tp[0], tp[1], i)
-            solutions.append(queue.pop_solutions())
-        solution = None
-        for sol in solutions:
-            if solution is None or (solution[0] <= sol[0] and solution[1] <= sol[1]):
-                solution = sol
-            elif ((solution[0] > sol[0] and solution[1] < sol[1]) or
-                  (solution[0] < sol[0] and solution[1] > sol[1])) and (
-                    (sol[0] ** 2 + sol[1] ** 2) < (solution[1] ** 2 + solution[0] ** 2)):
-                solution = sol
-        print(solutions)
-        return solution
-
-
-class SolNode:
-    def __init__(self, sinr, i):
-        self.sinr = sinr
-        self.i = i
-
-
-class SolQueue:
-    def __init__(self):
-        self.queue_one = [None, None]
-        self.queue_two = [None, None]
-
-    def add_value(self, sinr1, sinr2, i):
-        self.compare(self.queue_one, sinr1, i)
-        self.compare(self.queue_two, sinr2, i)
-
-    def compare(self, queue, sinr, i):
-        if queue[0] is None or queue[0].sinr < sinr:
-            sol_node = SolNode(sinr, i)
-            try:
-                if queue[1].sinr < sinr:
-                    queue[0] = queue[1]
-                    queue[1] = sol_node
-                else:
-                    queue[0] = sol_node
-            except AttributeError:
-                queue[1] = sol_node
-
-    def pop_solutions(self):
-        if self.queue_one[1].i == self.queue_two[1].i:
-            if (self.queue_one[1].sinr - self.queue_one[0].sinr) < (self.queue_two[1].sinr - self.queue_two[0].sinr):
-                return [self.queue_one[0].sinr, self.queue_two[1].sinr]
-            else:
-                return [self.queue_one[1].sinr, self.queue_two[0].sinr]
-        else:
-            return [self.queue_one[1].sinr, self.queue_two[1].sinr]
-
-
-new_Model_seed = ModelSeed(35, 30, 70, 0, 0, [0.1, 1.5, 1.8])
-print(new_Model_seed.calculate_fitness())

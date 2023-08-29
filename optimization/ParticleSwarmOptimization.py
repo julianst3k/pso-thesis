@@ -1,6 +1,8 @@
 import numpy as np
 import optimization.Archive_Tree as at
 import optimization.AdaptativeHypercubes as ah
+from threading import Thread
+from optimization.utils import UniformOutput
 
 class ParticleSwarmOptimization:
     def __init__(self, particle_number, dimension, parameters, turbulence, hypercubes):
@@ -17,7 +19,9 @@ class ParticleSwarmOptimization:
         self.velocidad = np.zeros((self.particle_number,len(self.parameters)))
         self.particle = np.zeros((self.particle_number,len(self.parameters)))
         self.eval_vec = np.zeros(self.particle_number)
-        self.bfp = np.zeros((self.particle_number, len(self.parameters)))
+        self.bfp = np.zeros((self.particle_number, self.dimension))
+        self.bfp_pos = np.zeros((self.particle_number, len(self.parameters)))
+
         self.rep = np.zeros((self.particle_number, len(self.parameters)))
 
     def initial_conditions(self, generator):
@@ -31,6 +35,26 @@ class ParticleSwarmOptimization:
         self.archive_controller(evaluated_values, self.get_hypercubes())
         self.gen_hypercubes()
         self.set_bests(evaluated_values, first_iter=first_iter)
+    def multiprocess_evaluation(self, fit_function, first_iter=False):
+        evaluated_values = np.zeros((self.particle_number, fit_function.get_objective_length()))
+        processes = []
+        for i in range(4):
+            processes.append(Thread(target=self.multiprocess_fitness, args=(fit_function, evaluated_values, i*self.particle_number//4, (i+1)*self.particle_number//4,)))
+            processes[i].start()
+        for p in processes:
+            p.join()
+
+        self.archive_controller(evaluated_values, self.get_hypercubes())
+        self.gen_hypercubes()
+        self.set_bests(evaluated_values, first_iter=first_iter)
+
+    def multiprocess_fitness(self, fit_function, evaluated_values, start, end):
+        for i in range(start, end):
+            evaluated_values[i, :] = fit_function.fitness(self.particle[i, :])
+            print(self.particle[i, :])
+
+
+
 
     def gen_hypercubes(self):
         nodes = self.repository.return_non_dominant_nodes()
@@ -54,14 +78,27 @@ class ParticleSwarmOptimization:
         for i, value in enumerate(eval):
             if first_iter:
                 self.bfp[i, :] = value
+                self.bfp_pos[i, :] = np.array([val for val in self.particle[i, :]])
             else:
                 if all([self.bfp[i, j] >= value[j] for j, _ in enumerate(value)]):
                     self.bfp[i, :] = value
+                    self.bfp_pos[i, :] = np.array([val for val in self.particle[i, :]])
 
     def update_state(self):
-        self.velocidad = 0.4*self.velocidad + np.random.rand()*(self.bfp-self.particle) + np.random.rand()*(self.rep - self.particle)+self.turbulence_factor
+        self.get_random_rep()
+        self.velocidad = 0.4*self.velocidad + np.random.rand(self.particle_number, len(self.parameters))*(self.bfp_pos-self.particle) \
+                         + np.random.rand(self.particle_number, len(self.parameters))*(self.rep - self.particle)+self.turbulence_factor
         self.particle += self.velocidad
         self.check_boundaries()
+
+    def mutate_state(self, it, max_iter, mutrate = 2.5):
+        for particle in self.particle:
+            dim = len(particle)
+            for i in range(dim):
+                dims_affected = np.random.binomial(1, (1-it/max_iter)**(dim/mutrate))
+                if dims_affected == 1:
+                    param = list(self.parameters.keys())[i]
+                    particle[i] = np.random.uniform(self.parameters[param]["lb"], self.parameters[param]["ub"])
 
     def check_boundaries(self):
         lb_array = []
@@ -84,11 +121,11 @@ class ParticleSwarmOptimization:
         return self.particle
 
     def get_repository(self):
-        return self.get_repository()
+        return self.repository
 
 class ParticleOptimizationIterator:
 
-    def __init__(self, particle_number, dimension, parameters, turbulence, hypercubes, iters, initial_function, fit_function):
+    def __init__(self, particle_number, dimension, parameters, turbulence, hypercubes, iters, initial_function, fit_function, track = False, multiprocess = False):
         self.parameters = parameters
         self.particle_number = particle_number
         self.turbulence_factor = turbulence
@@ -97,17 +134,34 @@ class ParticleOptimizationIterator:
         self.optimizator = ParticleSwarmOptimization(particle_number, dimension, parameters, turbulence, hypercubes)
         self.initial_function = initial_function
         self.function = fit_function
-        self.do_optimization(iters, fit_function)
+        self.results = []
+        self.track = self.do_optimization(iters, fit_function, track, multiprocess)
 
     def reset_optimizator(self):
         self.optimizator = ParticleSwarmOptimization(self.particle_number, self.dimension, self.parameters, self.turbulence, self.hypercubes)
 
-    def do_optimization(self, iters, function):
+    def do_optimization(self, iters, function, track = False, multiprocess = False):
         self.optimizator.initial_conditions(self.initial_function)
+        opt_dict = {}
         for i in range(iters):
-            self.get_optimizator().evaluation(function)
+            if not multiprocess:
+                self.get_optimizator().evaluation(function)
+            else:
+                self.get_optimizator().multiprocess_evaluation(function)
             self.get_optimizator().update_state()
-        return
+            if track:
+                nodes = self.get_best_results().return_non_dominant_nodes()
+                if i == 0:
+                    opt_dict["iter"] = [i]*len(nodes)
+                    opt_dict["particles"] = [node.particle for node in nodes]
+                    opt_dict["value"] = [node.value for node in nodes]
+                else:
+                    opt_dict["iter"].extend([i]*len(nodes))
+                    opt_dict["particles"].extend([node.particle for node in nodes])
+                    opt_dict["value"].extend([node.value for node in nodes])
+            self.get_optimizator().mutate_state(i+1, iters+1)
+
+        return opt_dict
 
     def get_optimizator(self):
         return self.optimizator
@@ -115,4 +169,6 @@ class ParticleOptimizationIterator:
     def get_best_results(self):
         return self.optimizator.get_repository()
 
+    def get_tracked_results(self):
+        return self.track
 

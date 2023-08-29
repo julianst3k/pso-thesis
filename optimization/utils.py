@@ -47,6 +47,8 @@ class UniformOutput(OutputFunction):
             logger.warning('Shape: %s', lb)
 
 
+
+
 class RandomOutput(OutputFunction):
 
     def __init__(self, multiplier):

@@ -255,12 +255,9 @@ pa::SimulationParameters* simulation, std::vector<std::vector<float>>* matrix){
 
     for(auto pd: recv->receivers){
         for(auto led: trans->transmitters){
-            std::cout << j << "\n";
             (*matrix)[i][j] = led_pd_channel(wall, led, pd, tunnel, simulation);
-            std::cout << (*matrix)[i][j] << "\n";
             j++;
         }
-        std::cout << pd->coordinate[0] << " " << pd->coordinate[1] << " " << pd->coordinate[2] << "\n";
         j = 0;
         i++;
     }
