@@ -2,7 +2,7 @@ import numpy as np
 import model as chb
 import ChannelModelling.ChannelModel as cm
 from ChannelModelling.ChannelModel import calculate_kr_km_ka
-import ShadowingSimulation as sm
+import ChannelSimulation.ShadowingSimulation as sm
 from abc import ABC, abstractmethod
 from yaml import load, dump, Loader
 

@@ -23,7 +23,7 @@ class ModelRunChannel(GenericRun):
     def update(self, coords):
         self.base_model.generate_receiver(coords)
         self.coords_generated = True
-    def __call__(self):
+    def __call__(self, restype=""):
         if self.coords_generated:
             model = self.base_model
             self.base_model.create_pybind_rotations(8)
@@ -41,13 +41,24 @@ class ModelRunResponse(GenericRun):
     def update(self, coords):
         self.base_model.generate_receiver(coords)
         self.coords_generated = True
-    def __call__(self):
+    def __call__(self, restype = ""):
         if self.coords_generated:
             model = self.base_model
             self.base_model.create_pybind_rotations(8)
-            resulting_array = chb.response_calculation(model.wp_bind, model.tag_bind, model.receiver_configurations,
-                                                      model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
-            print(resulting_array)
+
+            if restype == "los":
+                resulting_array = chb.response_calculation_los(model.wp_bind, model.tag_bind, model.receiver_configurations,
+                                                        model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
+            elif restype == "nlos":
+                resulting_array = chb.response_calculation_nlos(model.wp_bind, model.tag_bind, model.receiver_configurations,
+                                        model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
+            elif restype == "scatt":
+                resulting_array = chb.response_calculation_scattering(model.wp_bind, model.tag_bind, model.receiver_configurations,
+                                        model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
+            else:
+                resulting_array = chb.response_calculation(model.wp_bind, model.tag_bind, model.receiver_configurations,
+                                        model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
+
 
             return resulting_array
         else:
@@ -62,6 +73,6 @@ class ModelRunWrapper(GenericRun):
             self.model_runner = ModelRunResponse(config_params)
     def update(self, coords):
         self.model_runner.update(coords)
-    def __call__(self):
-        return self.model_runner()
+    def __call__(self, restype=""):
+        return self.model_runner(restype)
 
