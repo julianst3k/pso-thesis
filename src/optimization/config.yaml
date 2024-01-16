@@ -1,0 +1,22 @@
+numero_de_particulas : 50
+dimension : 2
+parameters:
+  - betat:
+      lb : 10
+      ub : 70
+  - betar:
+      lb : 10
+      ub : 70
+  - alphai:
+      lb : -30
+      ub : 30
+  - alphao:
+      lb : -30
+      ub : 30
+  - fov:
+      lb : 30
+      ub : 70
+hypercubes: 10
+turbulence: 1
+iters: 60
+

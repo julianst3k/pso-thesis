@@ -99,13 +99,27 @@ struct TunnelParameters{
     float z;
 
 };
+struct ScatterParameters{
+    ScatterParameters(int n, float radius, float f, float g, float gamma, float kr, float km, float p) :
+    n(n), radius(radius), f(f), g(g), gamma(gamma), kr(kr), km(km), p(p)  {}
+    int n;
+    float radius;
+    float f;
+    float g;
+    float gamma;
+    float kr;
+    float km;
+    float p;
 
+};
 struct SimulationParameters{
-    SimulationParameters(float t, float c, py::array_t<float> time, py::array_t<float> h_led) :
-    t(t), c(c), time(make_vector_1d_numpy(time)), h_led(make_vector_1d_numpy(h_led)) {}
+    SimulationParameters(float t, float c, py::array_t<float> time, py::array_t<float> h_led, ScatterParameters* scatters) :
+    t(t), c(c), time(make_vector_1d_numpy(time)), h_led(make_vector_1d_numpy(h_led)), scatters(scatters) {}
     float t;
     float c;
     std::vector<float> time;
     std::vector<float> h_led;
+    ScatterParameters* scatters;
+
 };
-};
+}

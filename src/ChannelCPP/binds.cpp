@@ -2,9 +2,11 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <parameter_aggregate.h>
-#include <channel.h>
+#include "parameter_aggregate.h"
+#include "channel.h"
+#include "shadowing.h"
 
+namespace sh = shadowing;
 namespace pa = parameter_aggregate;
 namespace py = pybind11;
 
@@ -36,11 +38,26 @@ PYBIND11_MODULE(model, m){
     py::class_<pa::TunnelParameters>(m, "TunnelParameters")
     .def(py::init<float,float,float>());
     py::class_<pa::SimulationParameters>(m, "SimulationParameters")
-    .def(py::init<float,float,py::array_t<float>,py::array_t<float>> ());
+    .def(py::init<float,float,py::array_t<float>,py::array_t<float>,pa::ScatterParameters*> ());
+    py::class_<sh::WH_Probabilities>(m, "WH_Probabilities")
+    .def(py::init<> ())
+    .def("push_probability", &sh::WH_Probabilities::push_probability);
+    py::class_<sh::Shadowing_Parameters_Coll>(m, "Shadow_Coll")
+    .def(py::init<> ())
+    .def("create_collection", &sh::Shadowing_Parameters_Coll::create_collection);
+    py::class_<pa::ScatterParameters>(m, "ScatteringParameters")
+    .def(py::init<int, float, float , float , float , float , float , float>());
+
     m.def("channel_calculation", &channel_calculation);
-    m.def("channel_calculation", &HLos);
-    m.def("channel_calculation", &HNLos);
-    m.def("channel_calculation", &incline);
-    m.def("channel_calculation", &find_index_t);
-    m.def("channel_calculation", &led_pd_channel);
+    m.def("response_calculation", &response_calculation);
+    m.def("response_calculation_scattering", &response_calculation_scattering);
+    m.def("response_calculation_los", &response_calculation_los);
+    m.def("response_calculation_nlos", &response_calculation_nlos);
+
+    // m.def("channel_calculation", &HLos);
+    // m.def("channel_calculation", &HNLos);
+    // m.def("channel_calculation", &incline);
+    // m.def("channel_calculation", &find_index_t);
+    // m.def("channel_calculation", &led_pd_channel);
+    m.def("calculate_expectancy", &sh::calculate_expectancy);
 }
