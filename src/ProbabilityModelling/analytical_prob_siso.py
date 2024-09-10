@@ -96,7 +96,12 @@ class AnalyticalProbability(ProbabilityCalculator):
                 return L2, None
     def _eq(self, L):
         return (self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta)
-
+    def calculate_probability(self):
+        ...
+    def calculate_probability_unitary(self):
+        ...
+    def calculate_probability_ring(self):
+        ...
 if __name__ == "__main__":
     beta = np.pi/180*45
     fov = np.pi/180*25
