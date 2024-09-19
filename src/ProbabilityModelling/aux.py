@@ -8,6 +8,9 @@ def cotan(ang):
 class Orientation(Enum):
     HORIZONTAL = 1
     VERTICAL = 2
+class Bound(Enum):
+    LOWER = 1
+    UPPER = 2
     
 class RecTriangle:
     def __init__(self, x, y, ang_crt, orientation):
@@ -32,6 +35,9 @@ class RecTriangle:
         return self.x*self.y/2
     def __str__(self):
         return f'Triangle: {self.x}, {self.y}, {self.ang_crt}'
+    def get_Dn(self):
+        Dn = self.x if self.orientation == Orientation.HORIZONTAL else self.y
+        return Dn 
 
 class ArbitraryTriangle:
     def __init__(self, x, y, ang_low, ang_high, orientation):
@@ -39,6 +45,7 @@ class ArbitraryTriangle:
         self.y = y 
         self.ang_low = ang_low 
         self.ang_high = ang_high
+        self.avg_ang = (ang_low+ang_high)/2
         self.orientation = orientation
         self._max_radius()
     def _max_radius(self):
@@ -48,6 +55,7 @@ class ArbitraryTriangle:
             self.max_r = abs(self.x/np.cos(avg_ang))
         else:
             self.max_r = abs(self.y/np.sin(avg_ang))
+
     def get_area(self):
         if self.orientation == Orientation.HORIZONTAL:
             low_tr = abs(self.x**2*np.tan(self.ang_low))
@@ -108,10 +116,9 @@ class UniformRectangle(Rectangle):
         super().__init__(X, Y)
         self.N = N
         self._gen_triangles(x_center, y_center, N)
-    
     def _gen_triangles(self, xc, yc, N):
         triangles = []
-        x_series = [self.X-xc, xc, xc, self.X-xc]
+        x_series = [xc, self.X-xc, self.X-xc, xc]
         y_series = [self.Y-yc, self.Y-yc, yc, yc]
         orientation_series = [Orientation.HORIZONTAL, Orientation.VERTICAL]
         delta = 2*np.pi/N
@@ -160,6 +167,23 @@ class IntegrationLimit:
         return self.low
     def __str__(self):
         return f'Low: {self.low}, High: {self.high}, type: {self.const}'
+
+class Interval:
+    def __init__(self, offset_lb, offset_ub, lb, ub):
+        """
+        This is the amount of info needed for the Interval solution
+
+        If both are offset or not offset then we use ub < lb
+        If ub is offset but lb is not offset or viceversa then we use [pi, lb]U[ub,lb]
+        If ub is offset then it is actually 2pi-ub
+        If lb is offset then it is actually 2pi-lb
+        """
+        self.offset_ub = offset_ub
+        self.offset_lb = offset_lb
+        self.lb = lb
+        self.ub = ub
+        if self.ub < self.lb:
+            self.lb = self.ub
 
 class ProbabilityCalculator(ABC):
     def __init__(self,fov, beta, h, r):

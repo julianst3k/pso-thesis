@@ -1,4 +1,4 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
 import numpy as np
 
 
@@ -15,7 +15,7 @@ class AnalyticalProbability(ProbabilityCalculator):
         self.lims = []
         if self.cosfov*self.b-self.a > 0:
             self.from_one = True
-            self.threshs = threshs[::-1]
+            self.threshs = self.threshs[::-1]
         filled = False
         for thresh in self.threshs:
             u = thresh["thr"]
@@ -98,8 +98,34 @@ class AnalyticalProbability(ProbabilityCalculator):
         return (self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta)
     def calculate_probability(self):
         ...
-    def calculate_probability_unitary(self):
-        ...
+    def calculate_probability_unitary(self, L_max):
+        tot_sum = 0
+        triangles = self.rect.triangles
+        for triangle in triangles:
+            Dn = triangle.get_Dn()
+            area = triangle.get_area()
+            if triangle.orientation == Orientation.HORIZONTAL:
+                if L_max < Dn:
+                    tot_sum += area*(triangle.ang_crt-triangle.ang_low)*L_max**2/(Dn**2*np.tan(triangle.ang_crt))
+                else:
+                    new_low = np.arccos(Dn/L_max)
+                    if new_low > triangle.ang_crt:
+                        triangle.change_ang(triangle.ang_crt)
+                        new_low = triangle.ang_crt
+                    tot_sum += area*(np.tan(new_low)/np.tan(triangle.ang_crt)+
+                        (triangle.ang_crt-new_low)*(L_max**2/(Dn**2*np.tan(triangle.ang_crt))))
+            else:
+                if L_max < Dn:
+                    tot_sum += area*(triangle.ang_high-triangle.ang_crt)*L_max**2/(Dn**2*cotan(triangle.ang_crt))
+                else:
+                    new_high = np.arcsin(Dn/L_max)
+                    if new_high < triangle.ang_crt:
+                        triangle.change_ang(triangle.ang_crt)
+                        new_high = triangle.ang_crt
+                    tot_sum += area*(cotan(new_high)/cotan(triangle.ang_crt)+
+                        (new_high-triangle.ang_crt)*(L_max**2/(Dn**2*cotan(triangle.ang_crt))))
+        return tot_sum
+
     def calculate_probability_ring(self):
         ...
 if __name__ == "__main__":
@@ -119,3 +145,4 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov, beta, h, r, threshs)
     an_prob.print_lims()
+    print(an_prob.calculate_probability_unitary(1.2))
