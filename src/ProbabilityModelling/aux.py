@@ -11,7 +11,9 @@ class Orientation(Enum):
 class Bound(Enum):
     LOWER = 1
     UPPER = 2
-    
+
+
+
 class RecTriangle:
     def __init__(self, x, y, ang_crt, orientation):
         self.x = x
@@ -182,9 +184,25 @@ class Interval:
         self.offset_lb = offset_lb
         self.lb = lb
         self.ub = ub
+        self.decreasing = False
         if self.ub < self.lb:
             self.lb = self.ub
+    def divide_interval(self, divider):
+        divided_ub = self.ub
+        self.ub = divider
+        return Interval(self.offset_lb, self.offset_ub, divider, divided_ub)
+class OffsetInterval(Interval):
+    def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False):
+        """
+        This is the amount of info needed for the Interval solution
 
+        If both are offset or not offset then we use ub < lb
+        If ub is offset but lb is not offset or viceversa then we use [pi, lb]U[ub,lb]
+        If ub is offset then it is actually 2pi-ub
+        If lb is offset then it is actually 2pi-lb
+        """
+        super().__init__(offset_lb, offset_ub, lb, ub)
+        self.pivoted = pivoted
 class ProbabilityCalculator(ABC):
     def __init__(self,fov, beta, h, r):
         self.r = r
@@ -195,7 +213,191 @@ class ProbabilityCalculator(ABC):
         self.a = self.hcos + self.r 
         self.cosfov = np.cos(fov)
 
+class 
 
+class IntervalSolver:
+    def __init__(self, Llow, Lhigh, interval: Interval, offset: OffsetInterval):
+        self.llow = Llow
+        self.lhigh = Lhigh
+        self.interval = interval
+        self.offset = offset
+
+    def _build_solution_root(self):
+        if self.interval.offset_lb:
+            if self.interval.offset_ub: 
+                self._lb_ub_offset_node()
+            else:
+                self._lb_offset_node()
+        else:
+            self._no_offset_node()
+
+    def _lb_ub_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  [max(lb,lbd),min(ub,ubd)]
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                res_intervs = self._check_max_min(min_intervs, max_intervs)
+            else:
+                """
+                  [lb*, min(ub*, ubd)] + [max(lb, lbd), ub*]
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                upper_res_intervs = self._check_max_min(...)
+                lower_res_intervs = self._check_max_min(...)
+                center_res_intervs = self._check_center(...)
+
+        else:
+            """
+                [max(lb*,lbd),min(ub*,ubd)]
+            """
+            max_intervs = self._solve_max_equation(...)
+            min_intervs = self._solve_min_equation(...)
+            res_intervs = self._check_max_min(min_intervs, max_intervs)
+
+    def _lb_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  ([lb,min(ub,ubd)] + [max(lb,lbd),ub])
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                upper_res_intervs = self._check_max_min(...)
+                lower_res_intervs = self._check_max_min(...)
+                center_res_intervs = self._check_center(...)
+
+
+            else:
+                """
+                    [-2pi, min(ub, ubd)] + [max(lb*, lbd*), 2pi]
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                upper_res_intervs = self._check_max_min(...)
+                lower_res_intervs = self._check_max_min(...)
+                center_res_intervs = self._check_center(...)
+
+               
+        else:
+            """
+                     [lbd, min(ub, ubd)] + [max(lb*, lbd), ubd]
+            """
+            max_intervs = self._solve_max_equation(...)
+            min_intervs = self._solve_min_equation(...)
+            upper_res_intervs = self._check_max_min(...)
+            lower_res_intervs = self._check_max_min(...)
+            center_res_intervs = self._check_center(...)
+
+    def _no_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  [max(lb,lbd*),min(ub,ubd*)]
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                res_intervs = self._check_max_min(min_intervs, max_intervs)
+            else:
+                """
+                   [lb, min(ub, ubd)] + [max(lb, lbd*), ub]
+                """
+                max_intervs = self._solve_max_equation(...)
+                min_intervs = self._solve_min_equation(...)
+                upper_res_intervs = self._check_max_min(...)
+                lower_res_intervs = self._check_max_min(...)
+                center_res_intervs = self._check_center(...)
+
+        else:
+            """
+                [max(lb,lbd),min(ub,ubd)]
+            """
+            max_intervs = self._solve_max_equation(...)
+            min_intervs = self._solve_min_equation(...)
+            res_intervs = self._check_max_min(min_intervs, max_intervs)
+
+
+
+class SecantSolution:
+    def __init__(self, Llow, Lhigh):
+        self.llow = Llow
+        self.lhigh = Lhigh
+    def solve_equation(self, f):
+        solved = False
+        an = self.llow
+        bn = self.lhigh
+        
+        epsilon = 1e-3
+        if f(an)*f(bn)>0:
+            return self._parabolic_solver(f)
+        else:
+            return self._solve_equation(f,an,bn)
+        
+
+    def _parabolic_solver(self, f):
+        an = self.llow
+        bn = self.lhigh
+        candidate = (an+bn)/2
+        rn = candidate 
+        if  f(an)*f(candidate) > 0 and f(bn)*f(candidate) > 0:
+            """
+            Here we create two different potential sides, something like a tree
+            One interval which is [an, rn] and other that is [rn, bn].
+            Exploiting the properties of this, we will select the middle point and either the lower or higher side depending
+            on the function value. 
+            Lets say mn = (an+rn)/2
+            Then if f(an)<0, f(mn)<0, f(rn)<0, and f(an)<f(mn)<f(rn) then the solution is never in [an, mn]
+            Same case if f(bn)<f(mn)<f(rn) holds for [mn, bn]
+            If f(bn)<f(rn)<f(mn) then the solution is for sure in [rn, bn] and we need to solely look in this interval using an = rn, rn = mn, ...
+            If f(an)<f(rn)<f(mn) then the solution is for sure in [an, rn]
+            If f(mn)>0 then you can do the parabolic solver on the case
+            """
+            solved = False
+            while not solved:
+                mna = (an+rn)/2
+                mnb = (bn+rn)/2
+                if f(mna)*f(an) < 0:
+                    rn = mna
+                    bn = rn
+                    break
+                elif f(mnb)*f(bn) < 0:
+                    an = rn 
+                    rn = mnb
+                    break
+                else:
+                    if f(rn) < f(mnb):
+                        an = rn 
+                        rn = mnb 
+                    elif f(rn) < f(mna):
+                        an = mna 
+                    else:
+                        an = mna 
+                        bn = mnb
+        return self._solve_equation(f, an, rn), self._solve_equation(f, bn, rn)
+    def _solve_equation(self, f, lb, ub):
+        an = lb
+        bn = ub
+        epsilon = 1e-3
+        solved = False
+        while not solved:
+            rn = (an+bn)/2
+            if f(an)*f(rn)>0:
+                an = rn
+            if f(bn)*f(rn)>0:
+                bn = rn
+            if f(rn)<epsilon:
+                return rn
+
+def my_equation(x):
+    term_one = np.arccos((np.cos(20*np.pi/180)*np.sqrt(x**2+1.551)-1.137)/(x*0.422)) - 1.47
+    u = (x+0.1)
+    term_two = -np.arccos((np.cos(20*np.pi/180)*np.sqrt(u**2+2.5411)-1.137)/(np.sqrt(u**2+0.994**2)*0.422)) - np.arctan((x*0.994)/(0.1*x+1))
+    return term_one-term_two
 if __name__=="__main__":
-    trg = UniformRectangle(5,3,1,1,360)
+    secant = SecantSolution(0.1, 0.695)
+    print(secant.solve_equation(my_equation))
+
 
