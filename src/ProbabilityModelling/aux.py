@@ -171,7 +171,7 @@ class IntegrationLimit:
         return f'Low: {self.low}, High: {self.high}, type: {self.const}'
 
 class Interval:
-    def __init__(self, offset_lb, offset_ub, lb, ub, upper_func = None, lower_func = None, pi_interval = False):
+    def __init__(self, offset_lb, offset_ub, lb, ub, upper_func = None, lower_func = None, consts = {}, pi_interval = False):
         """
         This is the amount of info needed for the Interval solution
 
@@ -188,6 +188,7 @@ class Interval:
         self.lower_func = lower_func
         self.pi_interval = pi_interval
         self.decreasing = False
+        self.consts = consts 
         if self.ub < self.lb:
             self.lb = self.ub
     def divide_interval(self, divider):
@@ -206,6 +207,8 @@ class Interval:
         ret_int = FunctionalInterval(self.offset_lb, self.offset_ub, self.lb, self.ub)
         ret_int.set_function(self.lower_func)
         return ret_int 
+    def set_consts(self, consts):
+        self.consts = consts
 class FunctionalInterval(Interval):
     def __init__(self, offset_lb, offset_ub, lb, ub):
         super().__init__(offset_lb, offset_ub, lb, ub)
@@ -214,7 +217,7 @@ class FunctionalInterval(Interval):
         self.function = func
 
 class OffsetInterval(Interval):
-    def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None):
+    def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None, consts = {}):
         """
         This is the amount of info needed for the Interval solution
 
@@ -223,7 +226,7 @@ class OffsetInterval(Interval):
         If ub is offset then it is actually 2pi-ub
         If lb is offset then it is actually 2pi-lb
         """
-        super().__init__(offset_lb, offset_ub, lb, ub, upper_func, lower_func)
+        super().__init__(offset_lb, offset_ub, lb, ub, upper_func, lower_func, consts)
         self.pivoted = pivoted
 class ProbabilityCalculator(ABC):
     def __init__(self,fov, beta, h, r):
@@ -310,71 +313,71 @@ class IntervalSolver:
             lower_set.append(max_interval_two)
         res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, upper_bound.get_upper_bound_interval()) for mini in higher_set]
         return res_intervs
-    def _interval_finder_merger(self, res_ub, res_lb):
-        pivot = None
-        j = 0
-        output_array = []
-        for i, interv in enumerate(res_ub):
-            cap = j < len(res_lb)
-            if j >= len(res_lb):
-                output_array.append([None, None, interv[0], interv[1]])
-            while not_capped:
-                if interv[0].lb > res_lb[j][0].lb:
-                    if res_lb[j][0].ub < interv[0].lb:
-                        lower_lb_solo = res_lb[j][0].inverse_divide_interval(interv[0].lb)
-                        upper_lb_solo = res_lb[j][1].inverse_divide_interval(interv[0].lb)
-                        output_array.append([lower_lb_solo,upper_lb_solo, None, None])
-                    else:
-                        output_array.append([res_lb[j][0],res_lb[j][1], None, None])
-                        j+=1
-                        cap = j < len(res_lb)
-                    if interv[0].ub < res_lb[j][0].ub:
-                        lower_lb_solo = res_lb[j][0].inverse_divide_interval(interv[0].ub)
-                        upper_lb_solo = res_lb[j][1].inverse_divide_interval(interv[0].ub)
-                        output_array.append([lower_lb_solo,upper_lb_solo, interv[0], interv[1]])
-                        break
-
-                    else:
-                        lower_lb_paired = interv[j][0].inverse_divide_interval(res_lb[j][0].ub)
-                        upper_lb_paired = interv[j][1].inverse_divide_interval(res_lb[j][0].ub)
-                        output_array.append([res_lb[j][0],res_lb[j][1], lower_lb_paired, upper_lb_paired])
-                        j+=1 
-                        cap = j < len(res_lb)
-                        
-                elif interv[0].lb < res_lb[j][0].lb:
-                    if res_lb[j][0].ub > interv[0].lb:
-                        lower_lb_solo = interv[0].inverse_divide_interval(res_lb[j][0].lb)
-                        upper_lb_solo = interv[1].inverse_divide_interval(res_lb[j][0].lb)
-                        output_array.append([None,None, lower_lb_solo, upper_lb_solo])
-                    else:
-                        output_array.append([None, None, interv[0], interv[1]])
-                        break
-                    if interv[0].ub > res_lb[j][0].ub:
-                        lower_lb_solo = interv[0].inverse_divide_interval(res_lb[j][0].ub)
-                        upper_lb_solo = interv[1].inverse_divide_interval(res_lb[j][0].ub)
-                        output_array.append([res_lb[j][0],res_lb[j][1], lower_lb_solo, upper_lb_solo])
-                        j+=1
-                        cap = j < len(res_lb)
-                    else:
-                        lower_lb_paired = res_lb[j][0].inverse_divide_interval(interv[0].ub)
-                        upper_lb_paired = res_lb[j][1].inverse_divide_interval(interv[0].ub)
-                        output_array.append([lower_lb_paired,upper_lb_paired, interv[0], interv[1]])
-                        break
+    def _inverse_divide_pair_wrapper(self, pivot, sets):
+        lower = sets[0].inverse_divide_interval(pivot)
+        upper = sets[1].inverse_divide_interval(pivot)
+        return lower, upper
+    def _interval_finder_merger_inner_iterator(self, res_lb, ub_interv, starting_index, output_array):
+        j = starting_index
+        not_capped = j < len(res_lb)
+        while not_capped:
+            lb_interv = res_lb[j] 
+            if ub_interv[0].lb > lb_interv[0].lb:
+                if lb_interv[0].ub > ub_interv[0].lb:
+                    lower_lb_solo, upper_lb_solo = self._inverse_divide_pair_wrapper(ub_interv[0].lb, lb_interv)
+                    output_array.append([lower_lb_solo,upper_lb_solo, None, None])
                 else:
-                    if interv[0].ub > res_lb[j][0].ub:
-                        lower_lb_solo = interv[0].inverse_divide_interval(res_lb[j][0].ub)
-                        upper_lb_solo = interv[1].inverse_divide_interval(res_lb[j][0].ub)
-                        output_array.append([res_lb[j][0],res_lb[j][1], lower_lb_solo, upper_lb_solo])
-                        j+=1
-                        cap = j < len(res_lb)
-                    else:
-                        lower_lb_paired = res_lb[j][0].inverse_divide_interval(interv[0].ub)
-                        upper_lb_paired = res_lb[j][1].inverse_divide_interval(interv[0].ub)
-                        output_array.append([lower_lb_paired,upper_lb_paired, interv[0], interv[1]])
-                        break
+                    output_array.append([lb_interv[0],lb_interv[1], None, None])
+                    j+=1
+                    cap = j < len(res_lb)
+                if ub_interv[0].ub < lb_interv[0].ub:
+                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])
+                    break
+
+                else:
+                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
+                    j+=1 
+                    cap = j < len(res_lb)
+                    
+            elif ub_interv[0].lb < lb_interv[0].lb:
+                if lb_interv[0].lb < ub_interv[0].ub:
+                    lower_ub_solo, upper_ub_solo = self._inverse_divide_pair_wrapper(lb_interv[0].lb, ub_interv)
+                    output_array.append([None,None, lower_ub_solo, upper_ub_solo])
+                else:
+                    output_array.append([None, None, ub_interv[0], ub_interv[1]])
+                    break
+                if ub_interv[0].ub > lb_interv[0].ub:
+                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
+                    j+=1
+                    cap = j < len(res_lb)
+                else:
+                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    output_array.append([lower_lb_paired, upper_lb_paired, ub_interv[0], ub_interv[1]])
+                    break
+            else:
+                if ub_interv[0].ub > lb_interv[0].ub:
+                    lower_ub_paired, upper_ub_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    output_array.append([lb_interv[0],lb_interv[1], lower_ub_paired, upper_ub_paired])
+                    j+=1
+                    cap = j < len(res_lb)
+                else:
+                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])
+                    break
+        return j
+    def _interval_finder_merger(self, res_ub, res_lb):
+        starting_index = 0
+        output_array = []
+        for i, ub_interv in enumerate(res_ub):
+            if starting_index >= len(res_lb):
+                output_array.append([None, None, ub_interv[0], ub_interv[1]])
+            starting_index = self._interval_finder_merger_inner_iterator(res_lb, ub_interv, starting_index, output_array)
         if j < len(res_lb):
             for k in range(j, len(res_lb)):
-                output_array.append([res_lb[j][0],res_lb[j][1],None,None])
+                output_array.append([lb_interv[0],lb_interv[1],None,None])
         return output_array
     def _check_centers_list(self, interval_list):
         output_array = []
