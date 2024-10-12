@@ -1,4 +1,4 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, IntervalSolver
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
@@ -14,34 +14,52 @@ class AnalyticalMISO(AnalyticalProbability):
     def _solve_lims_offset(self, theta=None):
         thresh_solver = eq.ThresholdSolver(self.threshs)
         self.offset_lims = thresh_solver.solve_lims_offset(self, theta)
-        print(self.offset_lims)
-        
-    def _solve_base_wrapper(self):
-        lims = self.lims
+    def _modulus_solver(func):
+        def _modulus_wrapper(self, *args, **kwargs):
+            output, divider = func(self, *args, **kwargs)
+            if divider is not None:
+                for triangle in self.rect:
+                    self._sort_intervals_by_lb(output)
+                    output[triangle] = self.divide_by_lims(output[triangle], divider[triangle] if triangle in divider else divider)
+            return output
+        return _modulus_wrapper    
+    def _generate_sol_offset_equations(self, theta = None):
+        self.sol_offset_equations = self._solve_offset_wrapper(theta)
+    def _generate_sol_base_equations(self, theta = None):
+        self.sol_base_equations = self._solve_offset_wrapper(theta)
+    @_modulus_solver
+    def _solve_base_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
-        self.sol_base_equations = base_solver.solve_base_equations(self.rect, self)
-        for triangle in self.rect:
-            self._sort_intervals_by_lb(self.sol_base_equations[triangle])
-            self.sol_base_equations[triangle] = self.divide_by_lims(self.sol_base_equations[triangle], self.lims)
-    
-    def _solve_offset_wrapper(self):
+        if theta is not None:
+            return base_solver.solve_base_equations(self, theta), None
+        else:
+            return base_solver.solve_base_equations_triangles(self.rect, self), self.lims
+    @_modulus_solver
+    def _solve_offset_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
-        self.sol_offset_equations = base_solver.solve_offset_equations(self.rect, self)
-        for triangle in self.rect:
-            self._sort_intervals_by_lb(self.sol_offset_equations[triangle])
-            self.sol_offset_equations[triangle] = self.divide_by_lims(self.sol_base_equations[triangle], self.offset_lims[triangle])
-        
-    def eq_offset(self, L, theta, neg=1, pivot = False):
-        off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
+        if theta is not None:
+            return base_solver.solve_offset_equations(self, theta), None
+        else:
+            return base_solver.solve_offset_equations_triangles(self.rect, self), self.offset_lims
 
-        return neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
-    
-    def eq_base(self, L, theta, neg=1):
-        return neg*np.arccos((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta))-theta
-    
+    def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False):
+        off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))-pivot*np.pi
+
+        return 2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
+    def eq_offset_int(self, L, theta, interval):
+        return self.eq_offset(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset)
+    def eq_base(self, L, theta, neg=1, pivot = False, is_offset = False):
+        return  2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta))-theta
+    def eq_offset_int(self, L, theta, interval):
+        return self.eq_base(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset)
+
     def _sort_intervals_by_lb(self, list_of_intervals):
         list_of_intervals.sort(key = lambda interval: interval.lb)
 
+
+    def print_intervals(self, intervals):
+        for interv in intervals:
+            print(interv)
     
     def divide_by_lims(self, list_of_intervals, list_of_thresholds):
         """
@@ -52,7 +70,7 @@ class AnalyticalMISO(AnalyticalProbability):
         """
         current_interval = 0
         return_interval = []
-        for i, lim in self.lims:
+        for i, lim in list_of_thresholds:
             not_completed = current_interval < len(list_of_intervals)
             while not_completed:
                 curr = list_of_intervals[current_interval]
@@ -77,7 +95,77 @@ class AnalyticalMISO(AnalyticalProbability):
         self._sort_intervals_by_lb(return_interval)
         return return_interval
 
-        
+    def interval_fitting(self, first_set, second_set):
+        """
+        It is assumed that both first and second sets are ordered
+        """
+        current_interval = 0
+        return_interval = []
+        for i, inter in first_set:
+            not_completed = current_interval < len(list_of_intervals)
+            while not_completed:
+                curr = list_of_intervals[current_interval]
+                if inter.ub < curr.ub:
+                    if inter.ub < curr.lb:
+                        """
+                        In this case, the interval is dismissed because no interval is intersecting
+                        """
+                        break
+                    if inter.lb <= curr.lb:
+                        _ = inter.inverse_divide_interval(curr.lb) # We discard the lower half
+                        new_curr = curr.inverse_divide_interval(inter.ub)
+                        return_interval.append([inter, new_curr])
+                        break
+                else:
+                    if inter.lb > curr.ub:
+                        current_interval += 1 
+                        not_completed = current_interval < len(list_of_intervals)
+                    if inter.lb >= curr.lb:
+                        new_inter = inter.inverse_divide_interval(curr.ub) # We discard the lower half
+                        _ = curr.inverse_divide_interval(inter.lb)
+                        return_interval.append([new_inter, curr])
+                        current_interval += 1
+                        not_completed = current_interval < len(list_of_intervals)
+                        break 
+        return return_interval
+
+    def arg_acos(self, u):
+
+
+    def interval_diff(self, u, theta, base_interval, offset_interval, is_lb = False):
+        offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
+        arg_acos_base = self.arg_acos(u)
+        arg_acos_offset = self.arg_acos(offset_u)
+        atan = np.arctan((u*np.sin(theta))/(u*np.cos(theta)+self.d))-offset_interval.pivoted*np.pi
+        if is_lb:
+            offset = 2*np.pi*offset_interval.offset_ub-arccos(arg_acos_offset)-atan 
+            base = 2*np.pi*base_interval.offset_ub-arccos(arg_acos_offset)-theta
+        else:
+            offset = 2*np.pi*offset_interval.offset_ub+arccos(arg_acos_offset)-atan 
+            base = 2*np.pi*base_interval.offset_ub+arccos(arg_acos_offset)-theta
+        return base-offset
+    def base_derivative(self, u, theta = None):
+        return 1/np.sqrt(1-arg_acos_base**2)*(u**2/np.sqrt(u**2+self.b**2)*self.cosfov*self.sin(beta)-
+        ((self.cosfov*np.sqrt(u**2+self.b**2)-a)*u*self.sinbeta))/(u**2*self.sinbeta**2)
+    def offset_derivative(self, u, theta):
+        offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
+        offset_derivative_arccos = self.base_derivative(offset_u)*(u+self.d*np.cos(theta))/offset_u
+        offset_derivative_tan = -1/(offset_u**2)*(self.d*np.sin(theta))
+        return offset_derivative_arccos - offset_derivative_tan
+
+    def interval_diff_d(self, u, theta, base_interval, offset_interval, is_lb = False):
+        offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
+        arg_acos_base = self.arg_acos(u)
+        arg_acos_offset = self.arg_acos(offset_u)
+        base_derivative = self.base_derivative(u)
+        offset_derivative_arccos = self.base_derivative(offset_u)*(u+self.d*np.cos(theta))/offset_u
+        offset_derivative_tan = -1/(offset_u**2)*(self.d*np.sin(theta))
+        if is_lb:
+            return -base_derivative+offset_derivative_arccos+offset_derivative_tan
+        else:
+            return base_derivative-offset_derivative_arccos+offset_derivative_tan
+
+
     
 if __name__ == "__main__":
     beta = np.pi/180*45
@@ -97,5 +185,5 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     
-    an_prob._solve_lims_offset(theta=3.5)
+    an_prob._generate_sol_offset_equations(theta=3.46)
     an_prob.print_lims()

@@ -5,63 +5,62 @@ class ArccosEquationSolver:
     def __init__(self, thresh):
         self.thresh = thresh
 
-    def solve_base_equations(self, triangles, parameters):
+    def solve_offset_equations(self, parameters, theta):
+        interval_solver = IntervalOffsetSolver()
+        output = []
+        d = parameters.d
+        dsin = parameters.d**2*np.sin(theta)**2
+        b1 = np.sqrt(parameters.b**2+dsin)
+        costh = np.cos(theta)
+        if theta >= np.pi/2 and theta <= 3/2*np.pi:
+            pivot = -d/np.cos(theta)
+        else:
+            pivot = None
+        a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
+        b = (2*d*parameters.cosfov**2+2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
+        c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
+        L1ap, L2ap, flagu = None, None, None
+        L1bp, L2bp, flagl = self._solve_quadratic_offset(a,b,c,theta,parameters)
+        if pivot is not None:
+            L1ap, L2ap, flagu = self._solve_quadratic_offset(a,b,c,theta,parameters,True)
+        output = interval_solver.offset_intervals_solver(L1bp, L2bp, L1ap, L2ap, pivot, theta, parameters, flagl, flagu)
+
+        return output
+
+    def solve_base_equations(self, parameters, theta):
+        interval_solver = IntervalOffsetSolver()
+        output = []
+        costh = np.cos(theta)
+        b = 2*parameters.sinbeta*costh*parameters.a
+        a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
+        c = parameters.b**2*parameters.cosfov**2-parameters.a**2
+        sol1, sol2 = self._solve_quadratic_base(a,b,c,theta,parameters)
+        output = interval_solver.base_intervals_solver(sol1, sol2, theta, parameters)
+        if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a > 0:
+            x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b**2)
+            for interv in output:
+                if interv.lb < x_switch:
+                    if interv.ub > x_switch:
+                        new_interval = interv.divide_interval(x_switch)
+                        new_interval.decreasing = True
+                        output.append(new_interval)
+                else:
+                    interv.decreasing = True
+        return output
+
+    def solve_base_equations_triangles(self, triangles, parameters):
         sol_base_equations = {}
-        interval_solver = IntervalOffsetSolver()
-        for triangle in triangles:
-            costh = np.cos(triangle.avg_ang)
-            b = 2*parameters.sinbeta*costh*parameters.a
-            a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
-            c = parameters.b**2*parameters.cosfov**2-parameters.a**2
-            sol1, sol2 = self._solve_quadratic_base(a,b,c,triangle.avg_ang,parameters)
-            sol_base_equations[triangle] = interval_solver.base_intervals_solver(sol1, sol2, triangle.avg_ang)
-            
-            if parameters.cosfov*np.sqrt(self.b**2)-parameters.a > 0:
-                x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b**2)
-                for interv in sol_base_equations[triangle]:
-                    if interv.lb < x_switch:
-                        if interv.ub > x_switch:
-                            new_interval = interv.divide_interval(x_switch)
-                            new_interval.decreasing = True
-                            sol_base_equations[triangle].append(new_interval)
-                        else:
-                            interv.decreasing = True
-    def solve_offset_equations(self, triangles, parameters):
-        sol_offset_equations = {}
-        interval_solver = IntervalOffsetSolver()
         for triangle in triangles:
             theta = triangle.avg_ang
-            d = parameters.d
-            dsin = parameters.d**2*np.sin(theta)**2
-            b1 = np.sqrt(parameters.b**2+dsin)
-            costh = np.cos(theta)
-            if theta >= np.pi/2 and theta <= 3/2*np.pi:
-                pivot = -d/np.cos(theta)
-            else:
-                pivot = None
-            a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
-            b = (2*d*parameters.cosfov**2+2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
-            c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
-            L1ap, L2ap, flagu = None, None, None
-            L1bp, L2bp, flagl = self._solve_quadratic_offset(a,b,c,theta,parameters)
-            if pivot is not None:
-                L1ap, L2ap, flagu = self._solve_quadratic_offset(a,b,c,theta,parameters,True)
-            sol_offset_equations[triangle] = interval_solver.offset_intervals_solver(L1bp, L2bp, L1ap, L2ap, pivot, theta, parameters, flagl, flagu)
-            if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a > 0:
-                try:
-                    x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b1**2)-parameters.d*costh
-                    if x_switch > pivot:
-                        x_switch = -np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b1**2)+parameters.d*costh
-                except:
-                    pass
-                for interv in sol_offset_equations[triangle]:
-                    if interv.lb < x_switch:
-                        if interv.ub > x_switch:
-                            new_interval = interv.divide_interval(x_switch)
-                            new_interval.decreasing = True
-                            sol_offset_equations[triangle].append(new_interval)
-                        else:
-                            interv.decreasing = True
+            sol_base_equations[triangle] = self.solve_base_equations(parameters, theta)
+        return sol_base_equations 
+
+    def solve_offset_equations_triangles(self, triangles, parameters):
+        sol_offset_equations = {}
+        for triangle in triangles:
+            theta = triangle.avg_ang
+            sol_offset_equations[triangle] = self.solve_offset_equations(parameters, theta)
+            
         return sol_offset_equations
     
     def _solve_quadratic_base(self, a, b, c, theta, parameters):

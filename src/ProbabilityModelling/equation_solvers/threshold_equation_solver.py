@@ -140,7 +140,6 @@ class ThresholdSolver:
         output_array.sort(key= lambda x: x.sort_radius())
 
     def _solve_lims_offset_theta(self, theta, thresh_res, parameters, output_array):
-        print(thresh_res)
         filled = False
         costh = np.cos(theta)
         center = -parameters.d*costh # Cute center
@@ -155,7 +154,6 @@ class ThresholdSolver:
         for i, thr in enumerate(thresh_res):
             thresh = self.threshs[i]
             sols = []
-            print("thr",thr[0])
             if thr[0] == None and not filled and not parameters.from_one:
                 output_array.append(IntegrationLimit(None, np.sqrt(parameters.X**2+parameters.Y**2), thresh["consts"]))
             elif thr[0] is not None:
@@ -173,7 +171,6 @@ class ThresholdSolver:
                     sol_one, sol_two = self._solve_quadratic(a,b,c,thresh["thr"],parameters,func=self._eq_offset_lims,theta=theta,ignore_negatives=False)
                     sols.append(sol_one) if sol_one is not None else ...
                     sols.append(sol_two) if sol_two is not None else ...
-                    print(sol_one, sol_two, a, b, c, thr[1])
             if len(sols) > 0:
                 """
                 We can have Zero, Two or Four solutions, depending on the case.
@@ -215,7 +212,6 @@ class ThresholdSolver:
         if remove_index is not None:
             del output_array[remove_index]
         output_array = filter(lambda x: np.abs(x.high - x.low) > 0.001 and x.high > x.low, output_array)
-        parameters.print_lims(output_array)
 
     def _solve_quadratic(self, a, b, c, u, parameters, func=None, theta=None, ignore_negatives = True):
         args = {}
@@ -237,7 +233,6 @@ class ThresholdSolver:
         if abs(func(**args)-u) > 0.01:
             L2 = None
 
-        print(L1, L2)
         if ignore_negatives:
             if L1 is not None and L1 > 0:
                 if L2 is None or L2 < 0:

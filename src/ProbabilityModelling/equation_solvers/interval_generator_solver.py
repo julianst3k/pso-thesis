@@ -67,6 +67,7 @@ class IntervalOffsetSolver:
                 interv = [Interval(True, True, 0, L2), Interval(True, False, L2, L1)]
             elif np.abs(parameters.eq_base(L2, theta, -1)+np.pi) < epsilon:
                 interv = [Interval(False, False, 0, L2), Interval(True, False, L2, L1)]
+        return interv
     def offset_intervals_solver(self, L1l, L2l, L1u, L2u, pivot, theta, parameters, flagl = None, flagu = None):
         if pivot is None:
             """
@@ -117,7 +118,7 @@ class IntervalOffsetSolver:
                 If flag == 1 => The second is boolean
                 If flag == 2 => The first is boolean
         """
-        maxr = np.sqrt(self.X**2+self.Y**2)
+        maxr = np.sqrt(parameters.X**2+parameters.Y**2)
         epsilon = 0.001
         if flag == 0:
             
