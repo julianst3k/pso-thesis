@@ -1,4 +1,4 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, IntervalSolver
+from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, IntervalSolver
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
@@ -10,7 +10,7 @@ class AnalyticalMISO(AnalyticalProbability):
         self.d = d
         self.rect = UniformRectangle(X, Y, x_center, y_center, 360)
         self._solve_lims_offset()
-    
+
     def _solve_lims_offset(self, theta=None):
         thresh_solver = eq.ThresholdSolver(self.threshs)
         self.offset_lims = thresh_solver.solve_lims_offset(self, theta)
@@ -25,32 +25,52 @@ class AnalyticalMISO(AnalyticalProbability):
         return _modulus_wrapper    
     def _generate_sol_offset_equations(self, theta = None):
         self.sol_offset_equations = self._solve_offset_wrapper(theta)
+
     def _generate_sol_base_equations(self, theta = None):
-        self.sol_base_equations = self._solve_offset_wrapper(theta)
+        self.sol_base_equations = self._solve_base_wrapper(theta)
+    def _interval_fit(self, theta = None):
+        self._solve_lims_offset(theta)
+        self._generate_sol_base_equations(theta)
+        self._generate_sol_offset_equations(theta)
+        self.print_intervals(self.sol_base_equations)
+        self.print_intervals(self.sol_offset_equations)
+        self.sol_base_equations = self.divide_by_lims(self.sol_base_equations, self.lims)
+        self.sol_offset_equations = self.divide_by_lims(self.sol_offset_equations, self.offset_lims)
+        if theta is not None:
+            self.base_offset_pairs = self.interval_fitting(self.sol_base_equations, self.sol_offset_equations)
+        else:
+            self.base_offset_pairs = {}
+            for triangle in self.rect:
+                self.base_offset_pairs[triangle] = self.interval_fitting(self.sol_base_equations[triangle], self.sol_offset_equations[triangle])
+
     @_modulus_solver
     def _solve_base_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
         if theta is not None:
-            return base_solver.solve_base_equations(self, theta), None
+            lmin = self.lims[0].low
+            return base_solver.solve_base_equations(self, theta, lmin), None
         else:
-            return base_solver.solve_base_equations_triangles(self.rect, self), self.lims
+            return base_solver.solve_base_equations_triangles(self.rect, self, self.lims), self.lims
     @_modulus_solver
     def _solve_offset_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
         if theta is not None:
-            return base_solver.solve_offset_equations(self, theta), None
+            lmin = self.offset_lims[0].low
+            return base_solver.solve_offset_equations(self, theta, lmin), None
         else:
-            return base_solver.solve_offset_equations_triangles(self.rect, self), self.offset_lims
+            return base_solver.solve_offset_equations_triangles(self.rect, self, self.offset_lims), self.offset_lims
 
-    def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False):
-        off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))-pivot*np.pi
+    def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
+        if np.abs((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)) > 1:
+            raise OutOfUnitaryBound
+        off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
 
-        return 2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
+        return 2*np.pi*is_offset*(-1)**negative_mod + neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
     def eq_offset_int(self, L, theta, interval):
-        return self.eq_offset(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset)
+        return self.eq_offset(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset, interval.ub_over_pi)
     def eq_base(self, L, theta, neg=1, pivot = False, is_offset = False):
         return  2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta))-theta
-    def eq_offset_int(self, L, theta, interval):
+    def eq_base_int(self, L, theta, interval):
         return self.eq_base(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset)
 
     def _sort_intervals_by_lb(self, list_of_intervals):
@@ -70,22 +90,19 @@ class AnalyticalMISO(AnalyticalProbability):
         """
         current_interval = 0
         return_interval = []
-        for i, lim in list_of_thresholds:
-            not_completed = current_interval < len(list_of_intervals)
-            while not_completed:
+        for i, lim in enumerate(list_of_thresholds):
+            while current_interval < len(list_of_intervals):
                 curr = list_of_intervals[current_interval]
-                if self.from_one and i==0:
-                    if lim.low <= curr.ub:
-                        _ = curr.inverse_divide_interval(lim.low)
-                        curr.set_consts(lim.const)
+                if curr.lb < lim.low:
+                    _ = curr.inverse_divided_interval(lim.low)
                 if lim.low <= curr.ub:
                     curr.set_consts(lim.const)
-                    if lim.high > curr.ub:
-                        added_interval = curr.inverse_divide_interval(lim.high)
-                        new_intervals.append(added_interval)
+                    if lim.high < curr.ub and lim.high > curr.lb:
+                        added_interval = curr.inverse_divided_interval(lim.high)
+                        return_interval.append(added_interval)
                         break                                
                     else:
-                        new_intervals.append(curr)
+                        return_interval.append(curr)
                         current_interval += 1
                         if lim.high == curr.ub:
                             break
@@ -101,10 +118,10 @@ class AnalyticalMISO(AnalyticalProbability):
         """
         current_interval = 0
         return_interval = []
-        for i, inter in first_set:
-            not_completed = current_interval < len(list_of_intervals)
+        for i, inter in enumerate(first_set):
+            not_completed = current_interval < len(second_set)
             while not_completed:
-                curr = list_of_intervals[current_interval]
+                curr = second_set[current_interval]
                 if inter.ub < curr.ub:
                     if inter.ub < curr.lb:
                         """
@@ -112,25 +129,31 @@ class AnalyticalMISO(AnalyticalProbability):
                         """
                         break
                     if inter.lb <= curr.lb:
-                        _ = inter.inverse_divide_interval(curr.lb) # We discard the lower half
-                        new_curr = curr.inverse_divide_interval(inter.ub)
+                        _ = inter.inverse_divided_interval(curr.lb) # We discard the lower half
+                        new_curr = curr.inverse_divided_interval(inter.ub)
                         return_interval.append([inter, new_curr])
                         break
                 else:
                     if inter.lb > curr.ub:
                         current_interval += 1 
-                        not_completed = current_interval < len(list_of_intervals)
+                        not_completed = current_interval < len(second_set)
                     if inter.lb >= curr.lb:
-                        new_inter = inter.inverse_divide_interval(curr.ub) # We discard the lower half
-                        _ = curr.inverse_divide_interval(inter.lb)
+                        new_inter = inter.inverse_divided_interval(curr.ub) # We discard the lower half
+                        _ = curr.inverse_divided_interval(new_inter.lb)
                         return_interval.append([new_inter, curr])
                         current_interval += 1
-                        not_completed = current_interval < len(list_of_intervals)
+                        not_completed = current_interval < len(second_set)
                         break 
         return return_interval
-
+    def _interval_solver(self, interval_pairs):
+        output = []
+        for interval_pair in interval_pairs:
+            base_pair = interval_pair[0]
+            offset_pair = interval_pair[1]
+            solver = IntervalSolver(base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
+            output.extend()
     def arg_acos(self, u):
-
+        return (self.cosfov*np.sqrt(u**2+self.b**2)-self.a)/(u*self.sinbeta)
 
     def interval_diff(self, u, theta, base_interval, offset_interval, is_lb = False):
         offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
@@ -169,7 +192,7 @@ class AnalyticalMISO(AnalyticalProbability):
     
 if __name__ == "__main__":
     beta = np.pi/180*45
-    fov = np.pi/180*30
+    fov = np.pi/180*60
     r = 0.05
     h = 1.2
     x_c = 1
@@ -184,6 +207,12 @@ if __name__ == "__main__":
                {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
-    
-    an_prob._generate_sol_offset_equations(theta=3.46)
-    an_prob.print_lims()
+    angles = np.linspace(0, 2*np.pi, 10)
+    an_prob._solve_lims_offset(0)
+    an_prob._interval_fit(0)
+    for i, pair in enumerate(an_prob.base_offset_pairs):
+        print(f"Pair {i}:")
+        print(pair[0])
+        print(pair[1])
+
+

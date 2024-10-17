@@ -70,7 +70,6 @@ class ThresholdSolver:
         return lims
     def _find_limit_constants(self, converger, parameters):
         for i, constant in enumerate(self.threshs):
-            print(constant)
             if parameters.from_one:
                 """
                  This case starts by 1 so first question would be, is bigger than one? 
@@ -116,6 +115,7 @@ class ThresholdSolver:
         if theta is not None:
             output_array = []
             self._solve_lims_offset_theta(theta, thresh_res, parameters, output_array)
+            return output_array
         else:
             for triangle in parameters.rect:
                 offset_lims[triangle] = []
@@ -144,7 +144,7 @@ class ThresholdSolver:
         costh = np.cos(theta)
         center = -parameters.d*costh # Cute center
         probe_value = self._eq_offset_lims(center, theta, parameters) if center**2+parameters.d**2+2*parameters.d*center != 0 else None # Lets test the value in center
-        if probe_value >= -1 and probe_value <=1:
+        if probe_value is not None and probe_value >= -1 and probe_value <=1:
             consts_probe = self._find_limit_constants(probe_value, parameters)
             output_array.append(IntegrationLimit(center, None, consts_probe))
             output_array.append(IntegrationLimit(None, center, consts_probe))

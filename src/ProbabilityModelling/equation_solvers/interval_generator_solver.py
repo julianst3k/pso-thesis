@@ -1,4 +1,4 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, OutOfUnitaryBound
 import numpy as np
 
 class IntervalOffsetSolver:
@@ -8,66 +8,59 @@ class IntervalOffsetSolver:
     """
     def __init__(self):
         ...
-
     def base_intervals_solver(self, L1, L2, theta, parameters):
-        """
-        The method takes two parameters, L1 and L2, which code information given certain requirements
-        L1 can be:
-        - False: In this case the offset never happens and it stays permanently 
-        - True: In this case the offset always happens and it stays permanently
-        - A number: In this case the offset happens after a value
-        L2 can be:
-        - False, True: According to the previous case
-        - A number: In this case, two offset happen after a value. As we know the behavior of the equation,
-        we know that these two offsets exist in an specific case
-        - None: In this case, the L1 offset happens after a value and we need to know which side is crossing (Upper or lower)
-        """
-        epsilon = 0.001
-        if not L1:
-            interv = [Interval(L1, L2, 0, np.sqrt(parameters.X**2+parameters.Y**2))]
-        if L1 and L2:
-            interv = [Interval(True, True, 0, np.sqrt(parameters.X**2+parameters.Y**2))]
-        if L2 == None:
-            if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a < 0:
-                """
-                In this case it only crosses once
-                Positive + -np.pi => False to True, and lb would be True True
-                Negative + -np.pi => True to False, and ub would be False False
-                It should never cross np.pi because the maximum is np.pi, 
-                """
-                if np.abs(parameters.eq_base(L1, theta)+np.pi) < epsilon:
-                    interv = [Interval(True, False, 0, L1), Interval(True, True, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
-                elif np.abs(parameters.eq_base(L1, theta, -1)+np.pi) < epsilon:
-                    interv = [Interval(True, False, 0, L1), Interval(False, False, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
-            else:
-                """
-                In this case if it cross only once in the positives it would be 
-                Positive + -np.pi => True to False, and lb would be True True 
-                Negative + -np.pi => False to True, and ub would be False False
-                It should never cross np.pi because the maximum is np.pi, 
-                """
-                if np.abs(parameters.eq_base(L1, theta)+np.pi) < epsilon:
-                    interv = [Interval(True, True, 0, L1), Interval(True, False, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
-                elif np.abs(parameters.eq_base(L1, theta, -1)+np.pi) < epsilon:
-                    interv = [Interval(False, False, 0, L1), Interval(True, False, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
+        maxr = np.sqrt(parameters.X**2+parameters.Y**2)
+        try:
+            if L1.is_wrapper:
+                if L2 is not None and (L2.ub or L2.lb):
+                    if (L1.ub or L1.lb):
+                        """
+                        Remember, L2 < L1
+                        """
 
-        elif L1<np.sqrt(parameters.X**2+parameters.Y**2):
-            """
-                The only case it crosses twice is in the case of self.cosfov*np.sqrt(self.b**2)-self.a > 0
-                In this case it would be
-                Positive + -np.pi => True to False, False to True, and True True True
-                Negative + -np.pi => False to True, True to False, and False, False, False
-            """
-            if np.abs(parameters.eq_base(L2, theta)+np.pi) < epsilon:
-                interv = [Interval(True, True, 0, L2), Interval(True, False, L2, L1), Interval(True, True, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
-            elif np.abs(parameters.eq_base(L2, theta, -1)+np.pi) < epsilon:
-                interv = [Interval(False, False, 0, L2), Interval(True, False, L2, L1), Interval(False, False, L1, np.sqrt(parameters.X**2+parameters.Y**2))]
-        elif L2<np.sqrt(parameters.X**2+parameters.Y**2):
-            if np.abs(parameters.eq_base(L2, theta)+np.pi) < epsilon:
-                interv = [Interval(True, True, 0, L2), Interval(True, False, L2, L1)]
-            elif np.abs(parameters.eq_base(L2, theta, -1)+np.pi) < epsilon:
-                interv = [Interval(False, False, 0, L2), Interval(True, False, L2, L1)]
+                        if L2.ub and L1.ub:
+                            interv = [Interval(True, True, 0, L2.sol), Interval(True, False, L2.sol, L1.sol), Interval(True, True, L1.sol, maxr)]
+
+                        elif L2.lb and L1.lb:
+                            interv = [Interval(False, False, 0, L2.sol), Interval(True, False, L2.sol, L1.sol), Interval(False, False, L1.sol, maxr)]
+                        elif L2.lb and L1.ub:
+                            bool_off_lb, val = self._get_base_bool(L2.sol, theta, parameters, -1)
+                            bool_off_ub, val = self._get_base_bool(L1.sol, theta, parameters, 1)
+                            interv = [Interval(not bool_off_lb, not bool_off_ub, 0, L2.sol), Interval(bool_off_lb, not bool_off_ub, L2.sol, L1.sol), Interval(bool_off_lb, bool_off_ub, L1.sol, maxr)]
+
+                        else:
+                            bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)
+                            bool_off_ub, val = self._get_base_bool(L2.sol, theta, parameters, 1)
+                            interv = [Interval(not bool_off_lb, not bool_off_ub, 0, L2.sol), Interval(not bool_off_lb, bool_off_ub, L2.sol, L1.sol), Interval(bool_off_lb, bool_off_ub, L1.sol, maxr)]
+
+
+                    else:
+
+                        if L2.ub:
+                            interv = [Interval(True, False, 0, L2.sol), Interval(True, True, L2.sol, maxr)]
+
+                        else:
+                            interv = [Interval(False, False, 0, L2.sol), Interval(True, False, L2.sol, maxr)]
+                else:
+                    if (L1.ub or L1.lb):
+                        if L1.ub:
+                            interv = [Interval(True, False, 0, L1.sol), Interval(True, True, L1.sol, maxr)]
+
+                        else:
+                            interv = [Interval(False, False, 0, L1.sol), Interval(True, False, L1.sol, maxr)]
+
+                    else:
+                        bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)
+                        bool_off_ub, val = self._get_base_bool(L1.sol, theta, parameters, 1)
+
+                        interv = [Interval(bool_off_lb, bool_off_ub, 0, maxr)]
+
+        except AttributeError:
+            print(L1)
+            interv = [Interval(L1, L2, 0, maxr)]
         return interv
+
+    
     def offset_intervals_solver(self, L1l, L2l, L1u, L2u, pivot, theta, parameters, flagl = None, flagu = None):
         if pivot is None:
             """
@@ -75,7 +68,7 @@ class IntervalOffsetSolver:
             This case is equivalent to the non offset solver! But since we coded the results differently, we need to
             do another function
             """
-            interv = self._offset_intervals_no_pivot_solver(L1, L2, theta, parameters)
+            interv = self._offset_generic_solver(L1l, L2l, theta, parameters, flagl)
         else:
             """
             In this case, there is a transition between pivot and not pivot that we need to take into account
@@ -85,69 +78,70 @@ class IntervalOffsetSolver:
             """
             There is a transition so we need to get the interval AND the transition
             """
-            interv_sol_one = self._offset_intervals_pivot_solver_lower(L1l, L2l, pivot, theta, parameters, flagl)
-            interv_sol_two = self._offset_intervals_pivot_solver_upper(L1u, L2u, pivot, theta, parameters, flagu)
+            interv_sol_one = self._offset_generic_solver(L1l, L2l, theta, parameters, flagl, pivot = pivot)
+            interv_sol_two = self._offset_generic_solver(L1u, L2u, theta, parameters, flagu, True, pivot = pivot)
             interv_sol_one.extend(interv_sol_two)
             interv = interv_sol_one
         return interv
-    def _offset_intervals_pivot_solver_lower(self, L1, L2, pivot, theta, parameters, flag):
+
+    
+    def _offset_generic_solver(self, L1, L2, theta, parameters, flag, pivoted = False, pivot = None):
         """
                 Since True and False evaluate to numerals, we need a flag to know anything
                 If flag == 0 => Both are boolean
                 If flag == 1 => The second is boolean
                 If flag == 2 => The first is boolean
+                If flag == 3 => Neither are boolean
+                In the case of flag 3, both L1 and L2 will be dictionaries that will tell us the direction
+                and the starting point
         """
-        epsilon = 0.001
+        maxr = np.sqrt(parameters.X**2+parameters.Y**2) if pivot is None or pivoted else pivot
+        floor = pivot if pivoted and pivot > 0 else 0
         if flag == 0:
             
-            interv = [OffsetInterval(L1, L2, 0, pivot)]
+            interv = [OffsetInterval(L1, L2, floor, maxr)]
         
         if flag == 1:
 
-            interv = [OffsetInterval(False, L2, 0, L1), OffsetInterval(True, L2, L1, pivot)]
+            bool_off, val = self._get_offset_bool(L1, theta, parameters, -1, pivoted = pivoted)
+            interv = [OffsetInterval(not bool_off, L2, floor, L1, over_pi = val), OffsetInterval(bool_off, L2, L1, maxr, over_pi = val)]
 
         if flag == 2:
+            bool_off, val = self._get_offset_bool(L2, theta, parameters, 1, pivoted = pivoted)
 
-            interv = [OffsetInterval(L1, False, 0, L2), OffsetInterval(L1, True, L2, pivot)]
-        
-        return interv
-    def _offset_intervals_pivot_solver_upper(self, L1, L2, pivot, theta, parameters, flag):
-        """
-                Since True and False evaluate to numerals, we need a flag to know anything
-                If flag == 0 => Both are boolean
-                If flag == 1 => The second is boolean
-                If flag == 2 => The first is boolean
-        """
-        maxr = np.sqrt(parameters.X**2+parameters.Y**2)
-        epsilon = 0.001
-        if flag == 0:
+            interv = [OffsetInterval(L1, not bool_off, floor, L2, over_pi = val), OffsetInterval(L1, bool_off, L2, maxr, over_pi = val)]
             
-            interv = [OffsetInterval(L1, L2, 0, pivot)]
+        if flag == 3:
+            if L1.lb and L2.lb:
+                interv = [OffsetInterval(False, False, floor, L2.sol, over_pi = val), OffsetInterval(True, False, L2.sol, L1.sol), OffsetInterval(False, False, L1.sol, maxr, over_pi = val)]
+
+            elif L1.ub and L2.ub:
+                interv = [OffsetInterval(True, True, floor, L2.sol, over_pi = val), OffsetInterval(True, False, L2.sol, L1.sol, over_pi = val), OffsetInterval(True, True, L1.sol, maxr, over_pi = val)]
         
-        if flag == 1:
+            elif L1.ub:
+                bool_off_lb, val = self._get_offset_bool(L2.sol, theta, parameters, -1, pivoted = pivoted)
+                bool_off_ub, val = self._get_offset_bool(L1.sol, theta, parameters, 1, pivoted = pivoted)
+                interv = [OffsetInterval(not bool_off_lb, not bool_off_ub, floor, L2.sol, over_pi = val), OffsetInterval(bool_off_lb, not bool_off_ub, L2.sol, L1.sol, over_pi = val), 
+                OffsetInterval(bool_off_lb, bool_off_ub, L1.sol, maxr, over_pi = val)]
+            else:
+                bool_off_lb, val = self._get_offset_bool(L1.sol, theta, parameters, -1, pivoted = pivoted)
+                bool_off_ub, val = self._get_offset_bool(L2.sol, theta, parameters, 1, pivoted = pivoted)
+                interv = [OffsetInterval(not bool_off_lb, not bool_off_ub, floor, L2.sol, over_pi = val), OffsetInterval(not bool_off_lb, bool_off_ub, L2.sol, L1.sol, over_pi = val), 
+                OffsetInterval(bool_off_lb, bool_off_ub, L1.sol, maxr, over_pi = val)]
 
-            interv = [OffsetInterval(True, L2, pivot, L1), OffsetInterval(False, L2, L1, maxr)]
-
-        if flag == 2:
-
-            interv = [OffsetInterval(L1, True, pivot, L2), OffsetInterval(L1, False, L2, maxr)]
-        
         return interv
     
-    
-    def _offset_intervals_no_pivot_solver(self, L1, L2, theta, parameters):
-        maxr = np.sqrt(self.X**2+self.Y**2)
-        epsilon = 0.001
-        if flag == 0:
-            
-            interv = [OffsetInterval(L1, L2, 0, maxr)]
-        
-        if flag == 1:
+    def _get_offset_bool(self, radius, theta, parameters, neg, pivoted):
+        try: 
+            val = parameters.eq_offset(radius+0.01, theta, neg, pivoted)
+        except OutOfUnitaryBound:
+            val = parameters.eq_offset(radius-0.01, theta, neg, pivoted)
+        return abs(val) > np.pi, val < 0
 
-            interv = [OffsetInterval(True, L2, 0, L1), OffsetInterval(False, L2, L1, maxr)]
+    def _get_base_bool(self, radius, theta, parameters, neg, pivoted = None):
+        try: 
+            val = parameters.eq_base(radius+0.01, theta, neg)
+        except OutOfUnitaryBound:
+            val = parameters.eq_base(radius-0.01, theta, neg)
+        return abs(val) > np.pi, val < 0
 
-        if flag == 2:
-
-            interv = [OffsetInterval(L1, True, 0, L2), OffsetInterval(L1, False, L2, maxr)]
-        
-        return interv

@@ -16,11 +16,9 @@ class AnalyticalProbability(ProbabilityCalculator):
     def solve_thresholds(self):
         thresh_solver = eq.ThresholdSolver(self.threshs)
         self.lims = thresh_solver.solve_equations(self)
-        print(self.lims)
     def print_lims(self, lims = None):
         if lims is None:
             lims = self.lims
-        print(lims)
         for lim in lims:
             print(lim)
 

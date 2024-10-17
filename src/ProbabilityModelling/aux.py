@@ -196,19 +196,21 @@ class Interval:
     def divide_interval(self, divider):
         divided_ub = self.ub
         self.ub = divider
-        return Interval(self.offset_lb, self.offset_ub, divider, divided_ub, upper_func, lower_func, consts, pi_interval)
+        return Interval(self.offset_lb, self.offset_ub, divider, divided_ub, self.upper_func, self.lower_func, self.consts, self.pi_interval)
     def inverse_divided_interval(self, divider):
         divided_lb = self.lb
         self.lb = divider
-        return Interval(self.offset_lb, self.offset_ub, divided_lb, divider, upper_func, lower_func, consts, pi_interval)
+        return Interval(self.offset_lb, self.offset_ub, divided_lb, divider, self.upper_func, self.lower_func, self.consts, self.pi_interval)
     def push_functional_interval(self, is_neg):
         return FunctionalInterval(self.offset_lb, self.offset_ub, self.lb, self.ub, consts = consts, pi_interval = pi_interval, is_offset = self.is_offset, is_neg = is_neg, is_pivoted = self.pivoted)
     def set_consts(self, consts):
         self.consts = consts
     def __str__(self):
-        return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Decreasing: {self.decreasing}'
+        return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Consts: {self.consts}'
     def is_interval(self):
         return True
+class OutOfUnitaryBound(Exception):
+    ...
 class FunctionalInterval(Interval):
     def __init__(self, offset_lb, offset_ub, lb, ub, consts, pi_interval, is_offset, is_neg, is_pivoted):
         super().__init__(offset_lb, offset_ub, lb, ub, consts = consts, pi_interval = pi_interval)
@@ -229,7 +231,7 @@ class FunctionalInterval(Interval):
             return params.base_derivative
 
 class OffsetInterval(Interval):
-    def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None, consts = {}):
+    def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None, consts = {}, over_pi = False):
         """
         This is the amount of info needed for the Interval solution
 
@@ -241,6 +243,7 @@ class OffsetInterval(Interval):
         super().__init__(offset_lb, offset_ub, lb, ub, upper_func, lower_func, consts)
         self.pivoted = pivoted
         self.is_offset = True 
+        self.ub_over_pi = over_pi
 class ProbabilityCalculator(ABC):
     def __init__(self,fov, beta, h, r):
         self.r = r
@@ -253,9 +256,9 @@ class ProbabilityCalculator(ABC):
 
 
 class IntervalSolver:
-    def __init__(self, Llow, Lhigh, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
-        self.llow = Llow
-        self.lhigh = Lhigh
+    def __init__(self, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
+        self.llow = interval.lb
+        self.lhigh = interval.ub
         self.interval = interval
         self.offset = offset
         self.func = func
@@ -263,14 +266,118 @@ class IntervalSolver:
         self.parameters = parameters
         self.constant_interval = Interval(False, False, Llow, Lhigh, upper_bound = lambda x: np.pi, lower_bound = lambda x: -np.pi, pi_interval = True)
     def _build_solution_root(self):
+        """
+        We can understand the solution as a tree.
+        The root is the conditions of the Lower Bound of the Base Interval
+        The Tree would look like this:
+
+                                Base
+                    LB Offset           LB No Offset
+                UB Offset UB No Offset  UB No Offset -> Since LB < UB, UB will never have offset without LB   
+        """
         if self.interval.offset_lb:
             if self.interval.offset_ub: 
-                self._lb_ub_offset_node()
+                return self._lb_ub_offset_node()
             else:
-                self._lb_offset_node()
+                return self._lb_offset_node()
         else:
-            self._no_offset_node()
+            return self._no_offset_node()
+
+ 
+
+    def _lb_ub_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  [max(lb,lbd),min(ub,ubd)]
+                """
+                output_sets = self._min_max_finder()
+                res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
+            else:
+                """
+                  [lb*, min(ub*, ubd)] + [max(lb, lbd), ub*]
+                        _lb_min              _ub_max
+                """
+                res_ub = self._ub_max_finder(self.offset)
+                res_lb = self._lb_min_finder(self.offset)
+                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
+                res_intervs = self._check_centers_list(intervals_merged)
+
+        else:
+            """
+                [max(lb*,lbd),min(ub*,ubd)]
+            """
+            output_sets = self._min_max_finder()
+            res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
+        filtered_output = filter_output(res_intervs)
+        return filtered_output
+    def _lb_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  ([lb,min(ub,ubd)] + [max(lb,lbd),ub])
+                """
+                res_ub = self._ub_max_finder(self.interval)
+                res_lb = self._lb_min_finder(self.interval)
+                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
+                res_intervs = self._check_centers_list(intervals_merged)
+
+
+            else:
+                """
+                    [-pi, min(ub, ubd)] + [max(lb*, lbd*), pi]
+                """
+                res_ub = self._ub_max_finder(self.constant_interval)
+                res_lb = self._lb_min_finder(self.constant_interval)
+                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
+                res_intervs = self._check_centers_list(intervals_merged)
+
+               
+        else:
+            """
+                     [lbd, min(ub, ubd)] + [max(lb*, lbd), ubd]
+            """
+            res_ub = self._ub_max_finder(self.interval)
+            res_lb = self._lb_min_finder(self.interval)
+            intervals_merged = self._interval_finder_merger(res_ub, res_lb)
+            res_intervs = self._check_centers_list(intervals_merged)
+        filtered_output = filter_output(res_intervs)
+        return filtered_output
+
+    def _no_offset_node(self):
+        if self.offset.offset_lb:
+            if self.offset.offset_ub:
+                """
+                  [max(lb,lbd*),min(ub,ubd*)]
+                """
+                output_sets = self._min_max_finder()
+                res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
+                filtered_output = filter_output(res_intervs)
+            else:
+                """
+                   [lb, min(ub, ubd)] + [max(lb, lbd*), ub]
+                """
+                res_ub = self._ub_max_finder(self.interval)
+                res_lb = self._lb_min_finder(self.interval)
+                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
+                res_intervs = self._check_centers_list(intervals_merged)
+
+        else:
+            """
+                [max(lb,lbd),min(ub,ubd)]
+            """
+            output_sets = self._min_max_finder()
+            res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
+        filtered_output = filter_output(res_intervs)
+        return filtered_output
+
     def _interval_sorter_generation(self, first_set, second_set):
+        """
+        The purpose of this class is to make the pairs that are going to be integrated
+        This method sorts the pairs to make them fit with each other to have proper 
+        upper and lower radius!
+
+        """
         output_sets = []
         j = 0
         for i, interv in enumerate(first_set):
@@ -292,6 +399,14 @@ class IntervalSolver:
                     j+=1
                 available_sc = j < len(second_set)
     def _min_max_finder(self):
+        """
+        We need to get the maximum and minimum for the intersection. Min Max finder
+        takes both intervals (Self.interval, Self.offset), and push a function (So we don't
+        modify the intervals but their children) and we solve the equation
+        f(x) = g(x)
+        The equation can have from 0 (No intersection, one is over the other all the time) to 2
+        (It alternates) 
+        """
         base_min = self.interval.push_functional_interval(True)
         offset_min = self.offset.push_functional_interval(True)
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, 
@@ -304,6 +419,10 @@ class IntervalSolver:
                 lower_set.append(max_interval_two)
 
         except AttributeError:
+            """
+            In this case, max_interval_two is a float, this is to check type
+            """
+
             if max_interval_one == base_min:
                 new_one = base_min.divide_interval(s1)
                 offset_min.ub = s2
@@ -347,10 +466,13 @@ class IntervalSolver:
         output_sets = self._interval_sorter_generation(higher_set, lower_set)
         return output_sets  
     def _lb_min_finder(self, lower_bound):
+        """
+        Similar to the previous case but we check the output to see if it is above Lower Bound
+        """
         base_max = self.interval.push_functional_interval(False)
         offset_max = self.offset.push_functional_interval(False)
-        min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, self.interval.(), 
-        self.offset.get_upper_bound_interval())
+        min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
+        offset_max)
         higher_set = [min_intervs_one]
         try:
             if min_intervs_two.is_interval():
@@ -482,90 +604,6 @@ class IntervalSolver:
                 interval_gen = self._center_interval_generator(interv[0].lb, interv[0].ub, interv[0], interv[3], center_checked_interval)
                 output_array.append(interval_gen)
                 
-
-    def _lb_ub_offset_node(self):
-        if self.offset.offset_lb:
-            if self.offset.offset_ub:
-                """
-                  [max(lb,lbd),min(ub,ubd)]
-                """
-                output_sets = self._min_max_finder()
-                res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
-            else:
-                """
-                  [lb*, min(ub*, ubd)] + [max(lb, lbd), ub*]
-                """
-                res_ub = self._ub_max_finder(self.offset)
-                res_lb = self._lb_min_finder(self.offset)
-                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
-                res_intervs = self._check_centers_list(intervals_merged)
-
-        else:
-            """
-                [max(lb*,lbd),min(ub*,ubd)]
-            """
-            output_sets = self._min_max_finder()
-            res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
-        filtered_output = filter_output(res_intervs)
-
-    def _lb_offset_node(self):
-        if self.offset.offset_lb:
-            if self.offset.offset_ub:
-                """
-                  ([lb,min(ub,ubd)] + [max(lb,lbd),ub])
-                """
-                res_ub = self._ub_max_finder(self.interval)
-                res_lb = self._lb_min_finder(self.interval)
-                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
-                res_intervs = self._check_centers_list(intervals_merged)
-
-
-            else:
-                """
-                    [-pi, min(ub, ubd)] + [max(lb*, lbd*), pi]
-                """
-                res_ub = self._ub_max_finder(self.constant_interval)
-                res_lb = self._lb_min_finder(self.constant_interval)
-                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
-                res_intervs = self._check_centers_list(intervals_merged)
-
-               
-        else:
-            """
-                     [lbd, min(ub, ubd)] + [max(lb*, lbd), ubd]
-            """
-            res_ub = self._ub_max_finder(self.interval)
-            res_lb = self._lb_min_finder(self.interval)
-            intervals_merged = self._interval_finder_merger(res_ub, res_lb)
-            res_intervs = self._check_centers_list(intervals_merged)
-        filtered_output = filter_output(res_intervs)
-   
-    def _no_offset_node(self):
-        if self.offset.offset_lb:
-            if self.offset.offset_ub:
-                """
-                  [max(lb,lbd*),min(ub,ubd*)]
-                """
-                output_sets = self._min_max_finder()
-                res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
-                filtered_output = filter_output(res_intervs)
-            else:
-                """
-                   [lb, min(ub, ubd)] + [max(lb, lbd*), ub]
-                """
-                res_ub = self._ub_max_finder(self.interval)
-                res_lb = self._lb_min_finder(self.interval)
-                intervals_merged = self._interval_finder_merger(res_ub, res_lb)
-                res_intervs = self._check_centers_list(intervals_merged)
-
-        else:
-            """
-                [max(lb,lbd),min(ub,ubd)]
-            """
-            output_sets = self._min_max_finder()
-            res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
-        filtered_output = filter_output(res_intervs)
-
     def filter_output(self, intervals):
         out = []
         for interval in intervals:
