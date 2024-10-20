@@ -202,7 +202,7 @@ class Interval:
         self.lb = divider
         return Interval(self.offset_lb, self.offset_ub, divided_lb, divider, self.upper_func, self.lower_func, self.consts, self.pi_interval)
     def push_functional_interval(self, is_neg):
-        return FunctionalInterval(self.offset_lb, self.offset_ub, self.lb, self.ub, consts = consts, pi_interval = pi_interval, is_offset = self.is_offset, is_neg = is_neg, is_pivoted = self.pivoted)
+        return FunctionalInterval(self.offset_lb, self.offset_ub, self.lb, self.ub, consts = self.consts, pi_interval = self.pi_interval, is_offset = self.is_offset, is_neg = is_neg, is_pivoted = self.pivoted)
     def set_consts(self, consts):
         self.consts = consts
     def __str__(self):
@@ -219,16 +219,16 @@ class FunctionalInterval(Interval):
         self.function = None
     def gen_func(self, params):
         if self.is_offset:
-            return params.eq_offset
+            return params.eq_offset_int
         elif self.pi_interval:
             return lambda x: (-1)**(not self.is_neg)*np.pi
         else:
-            return params.eq_base
+            return params.eq_base_int
     def gen_dfunc(self, params):
         if self.is_offset:
-            return params.offset_derivative
+            return params.offset_derivative_int
         else:
-            return params.base_derivative
+            return params.base_derivative_int
 
 class OffsetInterval(Interval):
     def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None, consts = {}, over_pi = False):
@@ -256,15 +256,18 @@ class ProbabilityCalculator(ABC):
 
 
 class IntervalSolver:
-    def __init__(self, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
+    def __init__(self, theta, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
         self.llow = interval.lb
         self.lhigh = interval.ub
+        self.theta = theta
         self.interval = interval
         self.offset = offset
         self.func = func
         self.dfunc = dfunc
         self.parameters = parameters
-        self.constant_interval = Interval(False, False, Llow, Lhigh, upper_bound = lambda x: np.pi, lower_bound = lambda x: -np.pi, pi_interval = True)
+        self.constant_interval = Interval(False, False, self.llow, self.lhigh, upper_func = lambda x: np.pi, lower_func = lambda x: -np.pi, pi_interval = True)
+    def solve(self):
+        return self._build_solution_root()
     def _build_solution_root(self):
         """
         We can understand the solution as a tree.
@@ -308,6 +311,7 @@ class IntervalSolver:
                 [max(lb*,lbd),min(ub*,ubd)]
             """
             output_sets = self._min_max_finder()
+            
             res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, maxi) for mini, maxi in output_sets]
         filtered_output = filter_output(res_intervs)
         return filtered_output
@@ -398,6 +402,7 @@ class IntervalSolver:
                     output_sets.append([sc_interv, new_interval])
                     j+=1
                 available_sc = j < len(second_set)
+        return output_sets
     def _min_max_finder(self):
         """
         We need to get the maximum and minimum for the intersection. Min Max finder
@@ -412,58 +417,64 @@ class IntervalSolver:
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, 
         offset_min)
         lower_set = [max_interval_one]
-        try:
-            if max_interval_two.is_interval():
-                max_interval_one.ub = breaking_point
-                max_interval_two.lb = breaking_point
-                lower_set.append(max_interval_two)
+        if max_interval_two is not None:
+            try:
+                if max_interval_two.is_interval():
+                    max_interval_one.ub = breaking_point
+                    max_interval_two.lb = breaking_point
+                    lower_set.append(max_interval_two)
 
-        except AttributeError:
-            """
-            In this case, max_interval_two is a float, this is to check type
-            """
-
-            if max_interval_one == base_min:
-                new_one = base_min.divide_interval(s1)
-                offset_min.ub = s2
-                new_one.lb = s2
-                offset_min.lb = s1
-                higher_set.append(offset_min)
-                higher_set.append(new_one)
-            if max_interval_one == offset_min:
-                new_one = max_interval_one.divide_interval(s1)
-                base_min.ub = s2
-                new_one.lb = s2
-                base_min.lb = s1
-                higher_set.append(base_min)
-                higher_set.append(new_one)
+            except AttributeError:
+                """
+                In this case, max_interval_two is a float, this is to check type
+                """
+                s1 = max_interval_two
+                s2 = breaking_point 
+                if max_interval_one == base_min:
+                    new_one = base_min.divide_interval(s1)
+                    offset_min.ub = s2
+                    new_one.lb = s2
+                    offset_min.lb = s1
+                    higher_set.append(offset_min)
+                    higher_set.append(new_one)
+                if max_interval_one == offset_min:
+                    new_one = max_interval_one.divide_interval(s1)
+                    base_min.ub = s2
+                    new_one.lb = s2
+                    base_min.lb = s1
+                    higher_set.append(base_min)
+                    higher_set.append(new_one)
         base_max = self.interval.push_functional_interval(False)
         offset_max = self.offset.push_functional_interval(False)
             
         min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
         offset_max)
         higher_set = [min_intervs_one]
-        try:
-            if min_intervs_two.is_interval():
-                min_intervs_one.ub = breaking_point
-                min_intervs_two.lb = breaking_point
-                higher_set.append(min_intervs_two) 
-        except AttributeError:
-            if min_intervs_one == base_max:
-                new_one = base_max.divide_interval(s1)
-                offset_max.ub = s2
-                new_one.lb = s2
-                offset_max.lb = s1
-                higher_set.append(offset_min)
-                higher_set.append(new_one)
-            if min_intervs_one == offset_max:
-                new_one = min_intervs_one.divide_interval(s1)
-                base_max.ub = s2
-                new_one.lb = s2
-                base_max.lb = s1
-                higher_set.append(base_min)
-                higher_set.append(new_one)
+        if min_intervs_two is not None:
+            try:
+                if min_intervs_two.is_interval():
+                    min_intervs_one.ub = breaking_point
+                    min_intervs_two.lb = breaking_point
+                    higher_set.append(min_intervs_two) 
+            except AttributeError:
+                s1 = min_intervs_two
+                s2 = breaking_point 
+                if min_intervs_one == base_max:
+                    new_one = base_max.divide_interval(s1)
+                    offset_max.ub = s2
+                    new_one.lb = s2
+                    offset_max.lb = s1
+                    higher_set.append(offset_min)
+                    higher_set.append(new_one)
+                if min_intervs_one == offset_max:
+                    new_one = min_intervs_one.divide_interval(s1)
+                    base_max.ub = s2
+                    new_one.lb = s2
+                    base_max.lb = s1
+                    higher_set.append(base_min)
+                    higher_set.append(new_one)
         output_sets = self._interval_sorter_generation(higher_set, lower_set)
+        
         return output_sets  
     def _lb_min_finder(self, lower_bound):
         """
@@ -474,26 +485,29 @@ class IntervalSolver:
         min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
         offset_max)
         higher_set = [min_intervs_one]
-        try:
-            if min_intervs_two.is_interval():
-                min_intervs_one.ub = breaking_point
-                min_intervs_two.lb = breaking_point
-                higher_set.append(min_intervs_two) 
-        except AttributeError:
-            if min_intervs_one == base_max:
-                new_one = base_max.divide_interval(s1)
-                offset_max.ub = s2
-                new_one.lb = s2
-                offset_max.lb = s1
-                higher_set.append(offset_min)
-                higher_set.append(new_one)
-            if min_intervs_one == offset_max:
-                new_one = min_intervs_one.divide_interval(s1)
-                base_max.ub = s2
-                new_one.lb = s2
-                base_max.lb = s1
-                higher_set.append(base_min)
-                higher_set.append(new_one)
+        if min_intervs_two is not None:
+            try:
+                if min_intervs_two.is_interval():
+                    min_intervs_one.ub = breaking_point
+                    min_intervs_two.lb = breaking_point
+                    higher_set.append(min_intervs_two) 
+            except AttributeError:
+                s1 = min_intervs_two
+                s2 = breaking_point 
+                if min_intervs_one == base_max:
+                    new_one = base_max.divide_interval(s1)
+                    offset_max.ub = s2
+                    new_one.lb = s2
+                    offset_max.lb = s1
+                    higher_set.append(offset_min)
+                    higher_set.append(new_one)
+                if min_intervs_one == offset_max:
+                    new_one = min_intervs_one.divide_interval(s1)
+                    base_max.ub = s2
+                    new_one.lb = s2
+                    base_max.lb = s1
+                    higher_set.append(base_min)
+                    higher_set.append(new_one)
         unf_res_intervs = [self._check_max_min(maxi.lb, maxi.ub, lower_bound.push_functional_interval(True), maxi) for maxi in higher_set]
         res_intervs = self.filter_output(unf_res_intervs)
         return res_intervs
@@ -502,26 +516,29 @@ class IntervalSolver:
         offset_min = self.offset.push_functional_interval(True)
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_max, offset_max)
         lower_set = [max_interval_one]
-        try:
-            if max_interval_two.is_interval():
-                min_intervs_one.ub = breaking_point
-                min_intervs_two.lb = breaking_point
-                lower_set.append(max_interval_two) 
-        except AttributeError:
-            if max_interval_one == base_max:
-                new_one = base_min.divide_interval(s1)
-                offset_max.ub = s2
-                new_one.lb = s2
-                offset_max.lb = s1
-                higher_set.append(offset_min)
-                higher_set.append(new_one)
-            if max_interval_one == offset_max:
-                new_one = max_interval_one.divide_interval(s1)
-                base_max.ub = s2
-                new_one.lb = s2
-                base_max.lb = s1
-                higher_set.append(base_min)
-                higher_set.append(new_one)
+        if max_interval_two:
+            try:
+                if max_interval_two.is_interval():
+                    min_intervs_one.ub = breaking_point
+                    min_intervs_two.lb = breaking_point
+                    lower_set.append(max_interval_two) 
+            except AttributeError:
+                s1 = max_interval_two
+                s2 = breaking_point 
+                if max_interval_one == base_max:
+                    new_one = base_min.divide_interval(s1)
+                    offset_max.ub = s2
+                    new_one.lb = s2
+                    offset_max.lb = s1
+                    higher_set.append(offset_min)
+                    higher_set.append(new_one)
+                if max_interval_one == offset_max:
+                    new_one = max_interval_one.divide_interval(s1)
+                    base_max.ub = s2
+                    new_one.lb = s2
+                    base_max.lb = s1
+                    higher_set.append(base_min)
+                    higher_set.append(new_one)
         unf_res_intervs = [self._check_max_min(mini.lb, mini.ub, mini, upper_bound.push_functional_interval(False)) for mini in higher_set]
         res_intervs = self.filter_output(unf_res_intervs)
         return res_intervs
@@ -625,24 +642,25 @@ class IntervalSolver:
         Two, One, breaking point: Re-do the intervals with One from br to high
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
-        s1, s2 = newton.solve(self.theta, interv_one, interv_two, False)
+        is_lb = True
+        s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
             """
             Two solutions
             """
-            if self.func(low) >= 0:
+            if self.func(low, self.theta, interv_one, interv_two, is_lb) >= 0:
                 return interv_one, s1, s2
             else:
                 return interv_two, s1, s2
         else:
             sol = s1 if s1 else s2 
             if not sol:
-                if self.func(low) >= 0:
+                if self.func(low, self.theta, interv_one, interv_two, is_lb) >= 0:
                     return interv_one, None, None
                 else:
                     return interv_two, None, None
             else:
-                if self.func(low) >= 0:
+                if self.func(low, self.theta, interv_one, interv_two, is_lb) >= 0:
                     return interv_one, interv_two, sol
                 else:
                     return interv_two, interv_one, sol
@@ -657,24 +675,25 @@ class IntervalSolver:
         Two, One, breaking point: Re-do the intervals with One from br to high
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
-        s1, s2 = newton.solve(self.theta, interv_one, interv_two, True)
+        is_lb = False
+        s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
             """
             Two solutions
             """
-            if self.func(low) <= 0:
+            if self.func(low, self.theta, interv_one, interv_two, is_lb) <= 0:
                 return interv_one, s1, s2
             else:
                 return interv_two, s1, s2
         else:
             sol = s1 if s1 else s2 
             if not sol:
-                if self.func(low) <= 0:
+                if self.func(low, self.theta, interv_one, interv_two, is_lb) <= 0:
                     return interv_one, None, None
                 else:
                     return interv_two, None, None
             else:
-                if self.func(low) <= 0:
+                if self.func(low, self.theta, interv_one, interv_two, is_lb) <= 0:
                     return interv_one, interv_two, sol
                 else:
                     return interv_two, interv_one, sol
@@ -688,9 +707,10 @@ class IntervalSolver:
         False, Interval, breaking point: To create the new intervals from br to high
         Interval, False, breaking point: To create the new intervals from low to br
         """
-        func = lambda x: interv_top(self.parameters)(self.parameters, x, self.theta, interv_bottom) - interv_bottom.gen_func(self.parameters)(self.parameters, x, self.theta, interv_bottom)
-        dfunc = lambda x: interv_top(self.parameters)(self.parameters, x, self.theta) - interv_bottom.gen_func(self.parameters)(self.parameters, x, self.theta)
+        func = lambda x, *args: interv_top.gen_func(self.parameters)(x, interv_top, self.theta) - interv_bottom.gen_func(self.parameters)(x, interv_bottom, self.theta)
+        dfunc = lambda x, *args: interv_top.gen_dfunc(self.parameters)(x, interv_top, self.theta) - interv_bottom.gen_dfunc(self.parameters)(x, interv_bottom, self.theta)
         newton = NewtonRaphson(low, high, func, dfunc, self.parameters)
+        s1, s2 = newton.solve(self.theta, interv_bottom, interv_top)
         if s1 and s2:
             """
             Two solutions
@@ -707,7 +727,7 @@ class IntervalSolver:
                 new_one.lb = s2
                 base_min.lb = s1
                 higher_set.append(base_min, new_one)
-            if self.func(low) >= 0:
+            if func(low) >= 0:
                 last_interv_top = interv_top.divide_interval(s1)
                 last_interv_bot = interv_top.divide_interval(s1)
                 last_interv_top.lb = s2
@@ -727,7 +747,7 @@ class IntervalSolver:
                 else:
                     return []
             else:
-                if self.func(low) <= 0:
+                if func(low) <= 0:
                     interv_bottom.lb = sol
                     interv_top.lb = sol
                     return [interv_bottom, interv_top]
@@ -774,35 +794,41 @@ class NewtonRaphson:
         self.func = func
         self.dfunc = dfunc
         self.params = parameters
-    def solve(self, theta, interval_base, interval_offset, is_lb):
-        xr = self.llow
-        xl = self.lhigh
+    def obtain_func_and_d(self, xr, *args):
         func = self.func
         dfunc = self.dfunc
+        xr_func = func(xr, *args)
+        xr_dfunc = dfunc(xr, *args)
+        return xr_func, xr_dfunc
+
+    def solve(self, theta, interval_base, interval_offset, is_lb = False):
+        xr = self.llow
+        xl = self.lhigh
         keep_xr = True
         keep_xl = True
         solved_r = False
         solved_l = False
         while keep_xr and keep_xl:
+            xr_func, xr_dfunc = self.obtain_func_and_d(xr, theta, interval_base, interval_offset, is_lb)
+            xl_func, xl_dfunc = self.obtain_func_and_d(xl, theta, interval_base, interval_offset, is_lb)
             if keep_xr:
                 try:
                     if keep_xr:
-                        xr -= func(self.params, xr, theta, base_interval, offset_interval, is_lb)/dfunc(self.params, xr, theta, base_interval, offset_interval, is_lb)
+                        xr -= xr_func/xr_dfunc
                 except ZeroDivisionError:
                     keep_xr = False
-                if xr < self.llow or abs(func(xr)) < 0.01 or np.abs(dfunc(xr)) < 0.01:
+                if xr < self.llow or abs(xr_func) < 0.01 or np.abs(xr_dfunc) < 0.01:
                     keep_xr = False
             if keep_xl:
                 try:
-                    xl -= func(self.params, xl, theta, base_interval, offset_interval, is_lb)/dfunc(self.params, xl, theta, base_interval, offset_interval, is_lb)
+                    xl -= xl_func/xl_dfunc
                 except ZeroDivisionError:
                     keep_xl = False
 
-                if xl > self.lhigh or abs(func(xl)) < 0.01 or np.abs(dfunc(xl)) < 0.01:
+                if xl > self.lhigh or abs(xl_func) < 0.01 or np.abs(xl_func) < 0.01:
                     keep_xl = False
-                    solved_l = abs(func(xr)) < 0.01
-            solved_r = abs(func(xr)) < 0.01
-            solved_l = abs(func(xl)) < 0.01
+            solved_r = abs(xr_dfunc) < 0.01
+            solved_l = abs(xl_func) < 0.01
         if not solved_r:
             xr = False
         if not solved_l:

@@ -11,8 +11,10 @@ class IntervalOffsetSolver:
     def base_intervals_solver(self, L1, L2, theta, parameters):
         maxr = np.sqrt(parameters.X**2+parameters.Y**2)
         try:
+            print(L1.ub, L2.ub, L1.lb, L2.lb)
             if L1.is_wrapper:
                 if L2 is not None and (L2.ub or L2.lb):
+                    print("xD?")
                     if (L1.ub or L1.lb):
                         """
                         Remember, L2 < L1
@@ -97,6 +99,7 @@ class IntervalOffsetSolver:
         """
         maxr = np.sqrt(parameters.X**2+parameters.Y**2) if pivot is None or pivoted else pivot
         floor = pivot if pivoted and pivot > 0 else 0
+        print(floor, flag, L2)
         if flag == 0:
             
             interv = [OffsetInterval(L1, L2, floor, maxr)]
@@ -107,6 +110,7 @@ class IntervalOffsetSolver:
             interv = [OffsetInterval(not bool_off, L2, floor, L1, over_pi = val), OffsetInterval(bool_off, L2, L1, maxr, over_pi = val)]
 
         if flag == 2:
+                
             bool_off, val = self._get_offset_bool(L2, theta, parameters, 1, pivoted = pivoted)
 
             interv = [OffsetInterval(L1, not bool_off, floor, L2, over_pi = val), OffsetInterval(L1, bool_off, L2, maxr, over_pi = val)]

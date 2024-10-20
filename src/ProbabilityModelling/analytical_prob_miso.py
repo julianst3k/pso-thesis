@@ -25,9 +25,11 @@ class AnalyticalMISO(AnalyticalProbability):
         return _modulus_wrapper    
     def _generate_sol_offset_equations(self, theta = None):
         self.sol_offset_equations = self._solve_offset_wrapper(theta)
+        self._sort_intervals_by_lb(self.sol_offset_equations)
 
     def _generate_sol_base_equations(self, theta = None):
         self.sol_base_equations = self._solve_base_wrapper(theta)
+        self._sort_intervals_by_lb(self.sol_base_equations)
     def _interval_fit(self, theta = None):
         self._solve_lims_offset(theta)
         self._generate_sol_base_equations(theta)
@@ -66,11 +68,11 @@ class AnalyticalMISO(AnalyticalProbability):
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
 
         return 2*np.pi*is_offset*(-1)**negative_mod + neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
-    def eq_offset_int(self, L, theta, interval):
+    def eq_offset_int(self, L, interval, theta):
         return self.eq_offset(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset, interval.ub_over_pi)
     def eq_base(self, L, theta, neg=1, pivot = False, is_offset = False):
         return  2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta))-theta
-    def eq_base_int(self, L, theta, interval):
+    def eq_base_int(self, L, interval, theta):
         return self.eq_base(L, theta, (-1)**(not interval.is_neg), interval.is_pivoted, interval.is_offset)
 
     def _sort_intervals_by_lb(self, list_of_intervals):
@@ -128,30 +130,35 @@ class AnalyticalMISO(AnalyticalProbability):
                         In this case, the interval is dismissed because no interval is intersecting
                         """
                         break
-                    if inter.lb <= curr.lb:
-                        _ = inter.inverse_divided_interval(curr.lb) # We discard the lower half
+                    else:
+                        if inter.lb <= curr.lb:
+                            _ = inter.inverse_divided_interval(curr.lb) # We discard the lower half
                         new_curr = curr.inverse_divided_interval(inter.ub)
                         return_interval.append([inter, new_curr])
+
                         break
                 else:
                     if inter.lb > curr.ub:
                         current_interval += 1 
                         not_completed = current_interval < len(second_set)
-                    if inter.lb >= curr.lb:
+                    else:
                         new_inter = inter.inverse_divided_interval(curr.ub) # We discard the lower half
-                        _ = curr.inverse_divided_interval(new_inter.lb)
+                        if inter.lb >= curr.lb:
+                            _ = curr.inverse_divided_interval(new_inter.lb)
                         return_interval.append([new_inter, curr])
                         current_interval += 1
                         not_completed = current_interval < len(second_set)
-                        break 
         return return_interval
-    def _interval_solver(self, interval_pairs):
+    def _interval_solver(self, interval_pairs, theta):
         output = []
         for interval_pair in interval_pairs:
             base_pair = interval_pair[0]
             offset_pair = interval_pair[1]
-            solver = IntervalSolver(base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
-            output.extend()
+            solver = IntervalSolver(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
+            solutions = solver.solve()
+            print(solutions)
+            output.extend(solutions)
+            input("Next Pair")
     def arg_acos(self, u):
         return (self.cosfov*np.sqrt(u**2+self.b**2)-self.a)/(u*self.sinbeta)
 
@@ -161,16 +168,23 @@ class AnalyticalMISO(AnalyticalProbability):
         arg_acos_offset = self.arg_acos(offset_u)
         atan = np.arctan((u*np.sin(theta))/(u*np.cos(theta)+self.d))-offset_interval.pivoted*np.pi
         if is_lb:
-            offset = 2*np.pi*offset_interval.offset_ub-arccos(arg_acos_offset)-atan 
-            base = 2*np.pi*base_interval.offset_ub-arccos(arg_acos_offset)-theta
+            offset = 2*np.pi*offset_interval.offset_ub-np.arccos(arg_acos_offset)-atan 
+            base = 2*np.pi*base_interval.offset_ub-np.arccos(arg_acos_offset)-theta
         else:
-            offset = 2*np.pi*offset_interval.offset_ub+arccos(arg_acos_offset)-atan 
-            base = 2*np.pi*base_interval.offset_ub+arccos(arg_acos_offset)-theta
+            offset = 2*np.pi*offset_interval.offset_ub+np.arccos(arg_acos_offset)-atan 
+            base = 2*np.pi*base_interval.offset_ub+np.arccos(arg_acos_offset)-theta
         return base-offset
     def base_derivative(self, u, theta = None):
-        return 1/np.sqrt(1-arg_acos_base**2)*(u**2/np.sqrt(u**2+self.b**2)*self.cosfov*self.sin(beta)-
-        ((self.cosfov*np.sqrt(u**2+self.b**2)-a)*u*self.sinbeta))/(u**2*self.sinbeta**2)
+        arg_acos_base = self.arg_acos(u)
+        return 1/np.sqrt(1-arg_acos_base**2)*(u**2/np.sqrt(u**2+self.b**2)*self.cosfov*self.sinbeta-
+        ((self.cosfov*np.sqrt(u**2+self.b**2)-self.a)*u*self.sinbeta))/(u**2*self.sinbeta**2)
+    def base_derivative_int(self, u, interval, theta = None):
+        return (-1)**(not interval.is_neg)*self.base_derivative(u, theta)
+    def offset_derivative_int(self, u, interval, theta):
+        offset_derivative_tan = -1/(offset_u**2)*(self.d*np.sin(theta))
+        return (-1)**(not interval.is_neg)*self.offset_derivative(u, theta)+2*offset_derivative_tan*(interval.is_neg)
     def offset_derivative(self, u, theta):
+        
         offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
         offset_derivative_arccos = self.base_derivative(offset_u)*(u+self.d*np.cos(theta))/offset_u
         offset_derivative_tan = -1/(offset_u**2)*(self.d*np.sin(theta))
@@ -192,7 +206,7 @@ class AnalyticalMISO(AnalyticalProbability):
     
 if __name__ == "__main__":
     beta = np.pi/180*45
-    fov = np.pi/180*60
+    fov = np.pi/180*30
     r = 0.05
     h = 1.2
     x_c = 1
@@ -208,11 +222,12 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     angles = np.linspace(0, 2*np.pi, 10)
-    an_prob._solve_lims_offset(0)
-    an_prob._interval_fit(0)
+    an_prob._solve_lims_offset(3.6)
+    an_prob._interval_fit(3.6)
     for i, pair in enumerate(an_prob.base_offset_pairs):
         print(f"Pair {i}:")
         print(pair[0])
         print(pair[1])
+    an_prob._interval_solver(an_prob.base_offset_pairs, 3.6)
 
 

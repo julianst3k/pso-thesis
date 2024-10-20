@@ -21,10 +21,11 @@ class ArccosEquationSolver:
         c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
         L1ap, L2ap, flagu = None, None, None
         L1bp, L2bp, flagl = self._solve_quadratic_offset(a, b, c, theta,parameters, pivot_point = -d/np.cos(theta), lmin = Lmin)
+        
         if pivot is not None:
             b = (2*d*parameters.cosfov**2-2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
             c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2-2*parameters.a*d*parameters.sinbeta
-            L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= -d/np.cos(theta), lmin = Lmin)
+            L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= -d/np.cos(theta), lmin = -d/np.cos(theta))
         output = interval_solver.offset_intervals_solver(L1bp, L2bp, L1ap, L2ap, pivot, theta, parameters, flagl, flagu)
 
         return output
@@ -38,7 +39,7 @@ class ArccosEquationSolver:
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
         sol1, sol2 = self._solve_quadratic_base(a,b,c,theta,parameters, Lmin)
         output = interval_solver.base_intervals_solver(sol1, sol2, theta, parameters)
-        print(sol1, sol2)
+        print(sol1.sol, sol2.sol)
         if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a > 0:
             x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b**2)
             for interv in output:
@@ -122,13 +123,13 @@ class ArccosEquationSolver:
             L2_is_lb = False
             ub_L1 = parameters.eq_base(L1, theta)
             lb_L1 = parameters.eq_base(L1, theta,neg=-1)
-            L1_is_lb = abs(ub_L1-np.pi) <= epsilon
-            L1_is_ub = abs(lb_L1-np.pi) <= epsilon
+            L1_is_ub = abs(ub_L1+np.pi) <= epsilon
+            L1_is_lb = abs(lb_L1+np.pi) <= epsilon
             if L2 is not None and L2 > 0:
                 ub_L2 = parameters.eq_base(L2, theta)
                 lb_L2 = parameters.eq_base(L2, theta,neg=-1)
-                L2_is_ub = abs(ub_L2-np.pi) <= epsilon
-                L2_is_lb = abs(lb_L2-np.pi) <= epsilon
+                L2_is_ub = abs(ub_L2+np.pi) <= epsilon
+                L2_is_lb = abs(lb_L2+np.pi) <= epsilon
                 return SolWrapper(L1, L1_is_lb, L1_is_ub), SolWrapper(L2, L2_is_lb, L2_is_ub)
             return SolWrapper(L1, L1_is_lb, L1_is_ub), None
         
@@ -180,7 +181,7 @@ class ArccosEquationSolver:
         L2_is_lb = False
         L1_is_lb = False
         L1_is_ub = False
-        if L1 < 0:
+        if L1 < lmin if not pivot else pivot_point:
             ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
             lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
             """
@@ -195,7 +196,7 @@ class ArccosEquationSolver:
                     L1_is_lb = True
             else:
                 L1_is_ub = True
-        if L2 < 0:
+        if L2 < lmin if not pivot else pivot_point:
             L2 = None
         else:
             if np.abs(parameters.eq_offset(L2, theta, pivot = pivot)+np.pi)>epsilon and np.abs(parameters.eq_offset(L2, theta, pivot = pivot)-np.pi)>epsilon:
