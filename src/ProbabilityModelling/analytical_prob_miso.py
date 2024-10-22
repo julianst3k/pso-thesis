@@ -1,4 +1,4 @@
-from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, IntervalSolver
+from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
@@ -156,7 +156,7 @@ class AnalyticalMISO(AnalyticalProbability):
         for interval_pair in interval_pairs:
             base_pair = interval_pair[0]
             offset_pair = interval_pair[1]
-            solver = IntervalSolver(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
+            solver = eq.PairGenerator(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
             print(base_pair)
             print(offset_pair)
             solutions = solver.solve()
