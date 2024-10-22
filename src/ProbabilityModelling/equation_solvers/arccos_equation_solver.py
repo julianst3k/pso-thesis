@@ -39,7 +39,6 @@ class ArccosEquationSolver:
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
         sol1, sol2 = self._solve_quadratic_base(a,b,c,theta,parameters, Lmin)
         output = interval_solver.base_intervals_solver(sol1, sol2, theta, parameters)
-        print(sol1.sol, sol2.sol)
         if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a > 0:
             x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b**2)
             for interv in output:
