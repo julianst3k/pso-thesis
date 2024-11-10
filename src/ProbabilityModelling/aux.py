@@ -106,7 +106,10 @@ class EightRectangle(Rectangle):
             for j in range(2):
                 y = y_series[i]
                 orientation = orientation_series[j]
-                ang_crt = np.arctan(y/x)
+                if i % 2 == 0:
+                    ang_crt = np.arctan(y/x)
+                else:
+                    ang_crt = np.arctan(x/y)
                 triangles.append(RecTriangle(x,y,ang_crt,orientation))
         self.triangles = triangles
 
