@@ -51,8 +51,62 @@ class NonOriginIntegrator:
         sigma = Dn**2/self.params.b**2
         sum_int_one = lambda x, t: cosfov/sinbeta*a*Dn*b*(np.tan(t)*np.sqrt(np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+
         np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, 1/(1+sigma**2))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, 1/(1+sigma**2))
-        sum_int_two = lambda x, t: self.sinh_int_cos(x, t)
-    def sinh_int_cos(self, x, t):
+        sum_int_two = lambda x, tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
+    def sinh_int_cos(self, x, tb, tt, Dn, max_order = 10):
+        b = self.params.b 
+        summation = 0
+        multiplier = b**2
+        if Dn < b:
+            tm = np.arccos(Dn/b)
+            if tt < tm:
+                tm = tt
+            for order in range(max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation += 1/(2*order+1)*factor*(self.f_sec(tm, order)-self.f_sec(tb, order))
+            for order in range(1,max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tm, order))
+
+            summation += np.log(Dn/b)*(tt-tm)-(self.f_log(tt)-self.f_log(tm))
+        else:
+            summation += np.log(Dn/b)*(tt-tb)-(self.f_log(tt)-self.f_log(tb))
+            for order in range(1,max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tb, order))
+        summation += np.log(b)*(tt-tb)
+        return summation*multiplier
+    def f_sec(self, t, order):
+        sum_base = np.tan(t)
+        if order > 0:
+            sum_base *= 1/np.cos(t)**(2*order-1)
+        else:
+            return np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
+        summation = 0
+        multiplier = 1
+        for i in range(order):
+            multiplier *= (order-(2*i-1)/2)/(order-i)
+            summation += multiplier*np.cos(t)**(2*i)
+        multiplier *= (-1/2)
+        summation += multiplier*np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
+        summation *= sum_base 
+        return summation
+    def f_cos(self, t, order):
+        sum_base = np.sin(t)*np.cos(t)**(2*order-1)
+        summation = 0
+        multiplier = 1
+        for i in range(order):
+            multiplier *= (order-(2*i-1)/2)/(order-i)
+            summation += multiplier*np.cos(t)**(-2*i)
+        return summation*sum_base
+    def f_log(self, t):
+        return -(np.pi/2-t)*np.log(np.pi/2-t)+(np.pi/2-t)+1/(3*6)*(np.pi/2-t)**3
+    def f_cosec(self, t, Dn):
         ...
     def integral_lambdas_linear(self):
         a = self.consts["a"]
