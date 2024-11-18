@@ -77,7 +77,7 @@ class NonOriginIntegrator:
         sum_int_three = lambda t: self.params.a/sinbeta*Dn*np.log(np.sin(t)/np.cos(t))
         sum_int_four = lambda t: b*Dn/2*cotan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
-    def sinh_int_cos(self, x, tb, tt, Dn, max_order = 10):
+    def sinh_int_cos(self, tb, tt, Dn, max_order = 10):
         b = self.params.b 
         summation = 0
         multiplier = b**2
@@ -86,28 +86,32 @@ class NonOriginIntegrator:
             if tt < tm:
                 tm = tt
             for order in range(max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
-                summation += 1/(2*order+1)*factor*(self.f_sec(tm, order)-self.f_sec(tb, order))
+                summation += 1/(2*order+1)*factor*(self.f_sec(tm, order)-self.f_sec(tb, order))*(Dn/b)**(2*order+1)
             for order in range(1,max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
                 summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tm, order))
 
-            summation += np.log(Dn/b)*(tt-tm)-(self.f_logcos(tt)-self.f_logcos(tm))
+            summation += np.log(2*Dn/b)*(tt-tm)-(self.f_logcos(tt)-self.f_logcos(tm))
         else:
-            summation += np.log(Dn/b)*(tt-tb)-(self.f_logcos(tt)-self.f_logcos(tb))
+            summation += np.log(2*Dn/b)*(tt-tb)-(self.f_logcos(tt)-self.f_logcos(tb))
             for order in range(1,max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
                 summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tb, order))
         summation += np.log(b)*(tt-tb)
         return summation*multiplier
-    def sinh_int_sin(self, x, tb, tt, Dn, max_order = 10):
-        b = self.params.b 
+    def sinh_int_sin(self, tb, tt, Dn, max_order = 10, debug = False):
+        """
+        TODO: Test against Wolfram values
+        integral of arcsinh(Dn/(bsin(x))) 
+        """
+        b = self.params.b if not debug else 1
         summation = 0
         multiplier = b**2
         if Dn < b:
@@ -115,27 +119,31 @@ class NonOriginIntegrator:
             if tt < tm:
                 tm = tt
             for order in range(max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
-                summation += 1/(2*order+1)*factor*(self.f_cosec(tm, order)-self.f_cosec(tb, order))
+                summation += 1/(2*order+1)*factor*(self.f_cosec(tt, order)-self.f_cosec(tm, order))*(Dn/b)**(2*order+1)
             for order in range(1,max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
-                summation -= 1/(2*order)*factor*(self.f_sin(tt, order)-self.f_sin(tm, order))
+                summation -= 1/(2*order)*factor*(self.f_sin(tm, order)-self.f_sin(tb, order))*(Dn/b)**(-2*order)
 
-            summation += np.log(Dn/b)*(tt-tm)-(self.f_logsin(tt)-self.f_logsin(tm))
+            summation += np.log(2*Dn/b)*(tt-tm)-(self.f_logsin(tt)-self.f_logsin(tm))
         else:
-            summation += np.log(Dn/b)*(tt-tb)-(self.f_logsin(tt)-self.f_logsin(tb))
+            summation += np.log(2*Dn/b)*(tt-tb)-(self.f_logsin(tt)-self.f_logsin(tb))
             for order in range(1,max_order):
-                factor = 1/sp.factorial(order)
+                factor = 1/sp.special.factorial(order)
                 for j in range(order):
                     factor *= (-1/2-j)
                 summation -= 1/(2*order)*factor*(self.f_sin(tt, order)-self.f_sin(tb, order))
         summation += np.log(b)*(tt-tb)
         return summation*multiplier
     def f_sec(self, t, order):
+        """
+            Tested: Yes
+            Integral of 1/cos^(2*order+1)(x)
+        """
         sum_base = np.tan(t)
         if order > 0:
             sum_base *= 1/np.cos(t)**(2*order-1)
@@ -154,6 +162,10 @@ class NonOriginIntegrator:
         summation += multiplier*np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
         return summation
     def f_cosec(self, t, order):
+        """
+            Tested: Yes
+            Integral of 1/sin^(2*order+1)(x)
+        """
         sum_base = -cotan(t)
         if order > 0:
             sum_base *= 1/np.sin(t)**(2*order-1)
@@ -294,5 +306,5 @@ if __name__=="__main__":
     X, Y, xc, yc = 5, 3, 1, 1
     rec = EightRectangle(X, Y, xc, yc)
     intrec = NonOriginIntegrator(1,2, None, None)
-    for i in range(1,5):
-        print([(x, intrec.f_cos(x, i)-intrec.f_cos(0, i)) for x in np.linspace(0, np.pi/3, 10)])
+    for Dn in np.arange(0.8,1.4, 0.2):
+        print([(x, intrec.sinh_int_sin(x, np.pi/2, Dn, debug = True)) for x in np.linspace(np.pi/10, np.pi/2, 10)])
