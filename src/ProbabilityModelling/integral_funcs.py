@@ -38,7 +38,17 @@ class NonOriginIntegrator:
             return cosine_int+linear_int, theta_mid
     def integral_cosine(self, Dn, theta_bot, theta_top, n):
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
-        ...
+        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_cosine(Dn)
+        inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
+        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
+        return outer_sum+inner_sum
+    def integral_sine(self, Dn, theta_bot, theta_top, n):
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
+        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_sine(Dn)
+        inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
+        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
+        return outer_sum+inner_sum
+    
     def integral_linear(self, Dn, theta_bot, theta_top, n):
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
@@ -49,9 +59,24 @@ class NonOriginIntegrator:
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
         sigma = Dn**2/self.params.b**2
-        sum_int_one = lambda x, t: cosfov/sinbeta*a*Dn*b*(np.tan(t)*np.sqrt(np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+
-        np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, 1/(1+sigma**2))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, 1/(1+sigma**2))
-        sum_int_two = lambda x, tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
+        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(np.tan(t)*np.sqrt(np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+ 
+        np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, 1/(1+sigma**2))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, 1/(1+sigma**2)))
+        sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
+        sum_int_three = lambda t: self.params.a/sinbeta*Dn*self.log_cos(t)
+        sum_int_four = lambda t: b*Dn/2*np.tan(t)
+        return sum_int_one, sum_int_two, sum_int_three, sum_int_four
+    def integral_lambdas_sine(self, Dn):
+        a = self.consts["a"]
+        b = self.consts["b"]
+        cosfov = self.params.cosfov
+        sinbeta = self.params.sinbeta
+        sigma = Dn**2/self.params.b**2
+        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(-cotan(t)*np.sqrt(-np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+
+        (sigma+1/sigma)*sp.special.ellipkinc(t, -1/sigma**4)-sigma*sp.special.ellipeinc(t, -1/sigma**4))
+        sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
+        sum_int_three = lambda t: self.params.a/sinbeta*Dn*np.log(np.sin(t)/np.cos(t))
+        sum_int_four = lambda t: b*Dn/2*cotan(t)
+        return sum_int_one, sum_int_two, sum_int_three, sum_int_four
     def sinh_int_cos(self, x, tb, tt, Dn, max_order = 10):
         b = self.params.b 
         summation = 0
@@ -71,9 +96,9 @@ class NonOriginIntegrator:
                     factor *= (-1/2-j)
                 summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tm, order))
 
-            summation += np.log(Dn/b)*(tt-tm)-(self.f_log(tt)-self.f_log(tm))
+            summation += np.log(Dn/b)*(tt-tm)-(self.f_logcos(tt)-self.f_logcos(tm))
         else:
-            summation += np.log(Dn/b)*(tt-tb)-(self.f_log(tt)-self.f_log(tb))
+            summation += np.log(Dn/b)*(tt-tb)-(self.f_logcos(tt)-self.f_logcos(tb))
             for order in range(1,max_order):
                 factor = 1/sp.factorial(order)
                 for j in range(order):
@@ -81,33 +106,122 @@ class NonOriginIntegrator:
                 summation -= 1/(2*order)*factor*(self.f_cos(tt, order)-self.f_cos(tb, order))
         summation += np.log(b)*(tt-tb)
         return summation*multiplier
+    def sinh_int_sin(self, x, tb, tt, Dn, max_order = 10):
+        b = self.params.b 
+        summation = 0
+        multiplier = b**2
+        if Dn < b:
+            tm = np.arccos(Dn/b)
+            if tt < tm:
+                tm = tt
+            for order in range(max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation += 1/(2*order+1)*factor*(self.f_cosec(tm, order)-self.f_cosec(tb, order))
+            for order in range(1,max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation -= 1/(2*order)*factor*(self.f_sin(tt, order)-self.f_sin(tm, order))
+
+            summation += np.log(Dn/b)*(tt-tm)-(self.f_logsin(tt)-self.f_logsin(tm))
+        else:
+            summation += np.log(Dn/b)*(tt-tb)-(self.f_logsin(tt)-self.f_logsin(tb))
+            for order in range(1,max_order):
+                factor = 1/sp.factorial(order)
+                for j in range(order):
+                    factor *= (-1/2-j)
+                summation -= 1/(2*order)*factor*(self.f_sin(tt, order)-self.f_sin(tb, order))
+        summation += np.log(b)*(tt-tb)
+        return summation*multiplier
     def f_sec(self, t, order):
         sum_base = np.tan(t)
         if order > 0:
             sum_base *= 1/np.cos(t)**(2*order-1)
         else:
+            print(np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))))
             return np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
         summation = 0
         multiplier = 1
         for i in range(order):
-            multiplier *= (order-(2*i-1)/2)/(order-i)
+            if i==0:
+                multiplier *= 1/(2*order-2*i)
+            else:
+                multiplier *= (order-(2*i-1)/2)/(order-i)
             summation += multiplier*np.cos(t)**(2*i)
-        multiplier *= (-1/2)
+        summation *= sum_base
         summation += multiplier*np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
-        summation *= sum_base 
         return summation
-    def f_cos(self, t, order):
-        sum_base = np.sin(t)*np.cos(t)**(2*order-1)
+    def f_cosec(self, t, order):
+        sum_base = -cotan(t)
+        if order > 0:
+            sum_base *= 1/np.sin(t)**(2*order-1)
+        else:
+            return np.log(np.sin(t/2)/np.cos(t/2))
         summation = 0
         multiplier = 1
         for i in range(order):
-            multiplier *= (order-(2*i-1)/2)/(order-i)
+            if i==0:
+                multiplier *= 1/(2*order-2*i)
+            else:
+                multiplier *= (order-(2*i-1)/2)/(order-i)
+            summation += multiplier*np.sin(t)**(2*i)
+        summation *= sum_base
+        summation += multiplier*np.log(np.sin(t/2)/np.cos(t/2))
+        return summation
+    def f_cos(self, t, order):
+        """
+            Tested: Yes
+            Integral of cos^(2*order)(x)
+        """
+        sum_base = np.sin(t)*np.cos(t)**(2*order-1)
+        summation = 0
+        multiplier = 1
+        if order == 0:
+            return t
+        for i in range(order):
+            if i==0:
+                multiplier *= 1/(2*order-2*i)
+            else:
+                multiplier *= (order-(2*i-1)/2)/(order-i)
             summation += multiplier*np.cos(t)**(-2*i)
-        return summation*sum_base
-    def f_log(self, t):
+        summation *= sum_base
+        summation += multiplier*t
+        return summation
+    def f_sin(self, t, order):
+        """
+        Tested: Yes
+        Integral of sin^(2*order)(x)
+        """
+        sum_base = -np.cos(t)*np.sin(t)**(2*order-1)
+        summation = 0
+        multiplier = 1
+        if order == 0:
+            return t
+        for i in range(order):
+            if i==0:
+                multiplier *= 1/(2*order-2*i)
+            else:
+                multiplier *= (order-(2*i-1)/2)/(order-i)
+            summation += multiplier*np.sin(t)**(-2*i)
+        summation *= sum_base
+        summation += multiplier*t
+        return summation
+    def f_logcos(self, t):
+        """
+        Tested: Yes
+        Integral of log(cos(x))
+        """
         return -(np.pi/2-t)*np.log(np.pi/2-t)+(np.pi/2-t)+1/(3*6)*(np.pi/2-t)**3
-    def f_cosec(self, t, Dn):
-        ...
+    def f_logsin(self, t):
+        """
+        Tested: Yes
+        Integral of log(sin(x))
+        """
+        return t*np.log(t)-t-1/(3*6)*t**3
+    def log_cos(self, t):
+        return np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
     def integral_lambdas_linear(self):
         a = self.consts["a"]
         b = self.consts["b"]
@@ -118,6 +232,7 @@ class NonOriginIntegrator:
         sum_int_c = lambda x: b*x**2
         return sum_int_a, sum_int_b, sum_int_c
     def integral_odd(self, Dn, theta_bot, theta_top, n):
+        ...
 
 class OriginIntegrator:
     def __init__(self, radius):
@@ -178,8 +293,6 @@ class RectangleIntegrator:
 if __name__=="__main__":
     X, Y, xc, yc = 5, 3, 1, 1
     rec = EightRectangle(X, Y, xc, yc)
-    intrec = RectangleIntegrator(rec)
-    L1 = 1
-    int_sum = intrec.unitary_integrator(L1)
-    print(int_sum)
-    print(np.pi/(15))
+    intrec = NonOriginIntegrator(1,2, None, None)
+    for i in range(1,5):
+        print([(x, intrec.f_cos(x, i)-intrec.f_cos(0, i)) for x in np.linspace(0, np.pi/3, 10)])
