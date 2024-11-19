@@ -24,18 +24,33 @@ class NonOriginIntegrator:
         self.ub = ub
         self.consts = consts
         self.params = parameters
-    def integral_even(self, Dn, theta_bot, theta_top, n):
-        theta_cr = theta_top
-        max_Dn = Dn/np.cos(theta_cr)
+    def integral_even(self, Dn, theta_bot, theta_top, theta_crt, n):
+        max_Dn = Dn/np.cos(theta_top)
         if self.ub > max_Dn:
             return 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_top, n), theta_top
         elif self.ub < Dn:
             return 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_top, n), None
         else:
             theta_mid = np.arccos(Dn/self.ub)
-            cosine_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_mid, theta_top, n)
-            linear_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_mid, n)
+            if theta_mid < theta_top:
+                theta_mid = theta_top
+            cosine_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_mid, n)
+            linear_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_mid, theta_top, n)
             return cosine_int+linear_int, theta_mid
+    def integral_odd(self, Dn, theta_bot, theta_top, theta_crt, n):
+        max_Dn = Dn/np.sin(theta_bot)
+        if self.ub > max_Dn:
+            return 1/(Dn**2*np.cotan(theta_cr))*self.integral_sine(Dn, theta_bot, theta_top, n), theta_top
+        elif self.ub < Dn:
+            return 1/(Dn**2*np.cotan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_top, n), None
+        else:
+            theta_mid = np.arcsin(Dn/self.ub)
+            if theta_mid > theta_top:
+                theta_mid = theta_top
+            sine_int = 1/(Dn**2*np.cotan(theta_cr))*self.integral_sine(Dn, theta_mid, theta_top, n)
+            linear_int = 1/(Dn**2*np.cotan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_mid, n)
+            return sine_int+linear_int, theta_mid
+
     def integral_cosine(self, Dn, theta_bot, theta_top, n):
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
         sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_cosine(Dn)
@@ -83,6 +98,7 @@ class NonOriginIntegrator:
         """
             All the functions relation to solving the integral of the function Gn(Dn/sin(x))
             Gn(x) = X(X^2+b^2)^0.5 + ln((X^2+b^2)^0.5+X) - X + X^2
+            Tested: Yes
         """
         if not debug:
             a = self.consts["a"]
@@ -278,15 +294,12 @@ class NonOriginIntegrator:
         sum_int_b = lambda x: self.params.a/sinbeta*X
         sum_int_c = lambda x: b*x**2
         return sum_int_a, sum_int_b, sum_int_c
-    def integral_odd(self, Dn, theta_bot, theta_top, n):
-        ...
 
 class OriginIntegrator:
     def __init__(self, radius):
         self.radius = radius
-    def unitary_integral_even(self, Dn, theta_bot, theta_top, n):
+    def integral_even(self, Dn, theta_bot, theta_top, theta_cr, n):
         L1 = self.radius
-        theta_cr = theta_top
         max_Dn = Dn/np.cos(theta_cr)
         if L1 > max_Dn:
             return 1, None
@@ -295,9 +308,8 @@ class OriginIntegrator:
         else:
             theta_mid = np.arccos(Dn/L1)
             return 1/np.tan(theta_cr)*np.tan(theta_mid)-1/np.tan(theta_cr)*np.tan(theta_bot)+(theta_cr-theta_mid)*L1**2/((Dn**2)*np.tan(theta_cr)), theta_mid
-    def unitary_integral_odd(self, Dn, theta_bot, theta_top, n):
+    def integral_odd(self, Dn, theta_bot, theta_top, theta_cr, n):
         L1 = self.radius
-        theta_cr = theta_bot
         max_Dn = Dn/np.sin(theta_cr)
         if L1 > max_Dn:
             return 1, None
@@ -319,10 +331,10 @@ class RectangleIntegrator:
             for i, tri in enumerate(self.rect):
                 if i % 2 == 0:
                     Dn = tri.x if i%4 == 0 else tri.y
-                    integr, crt = integrator.unitary_integral_even(Dn, tri.ang_crt, tri.ang_high, i)
+                    integr, crt = integrator.integral_even(Dn, tri.ang_low, tri.ang_high, tri.ang_crt, i)
                 else:
                     Dn = tri.y if i%4 == 1 else tri.x
-                    integr, crt = integrator.unitary_integral_odd(Dn, tri.ang_crt, tri.ang_high, i)
+                    integr, crt = integrator.integral_odd(Dn, tri.ang_low, tri.ang_high, tri.ang_crt, i)
                 int_sum += integr*tri.get_area()/(X*Y)
                 if crt is not None:
                     tri.change_ang(crt)
@@ -332,6 +344,10 @@ class RectangleIntegrator:
     @_integrate
     def unitary_integrator(self, L1):
         integrator = OriginIntegrator(L1)
+        return integrator
+    @_integrate
+    def non_origin_integrator(self, L1, L2, consts, parameters):
+        integrator = NonOriginIntegrator(L1, L2, consts, parameters)
         return integrator
 
     
