@@ -1,4 +1,5 @@
 from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
+from integral_funcs import RectangleIntegrator
 import numpy as np
 import equation_solvers as eq
 
@@ -24,7 +25,14 @@ class AnalyticalProbability(ProbabilityCalculator):
 
     
     def calculate_probability(self):
-        ...
+        integrator = RectangleIntegrator(self.rect)
+        for lim in self.lims:
+            if lim["type"] != 1:
+                integrator.non_origin_integrator(lim.low, lim.high, lim.const, self)
+            else:
+                integrator.origin_integrator(lim.high)
+            
+        
     def calculate_probability_unitary(self, L_max):
         tot_sum = 0
         triangles = self.rect.triangles
@@ -53,8 +61,6 @@ class AnalyticalProbability(ProbabilityCalculator):
                         (new_high-triangle.ang_crt)*(L_max**2/(Dn**2*cotan(triangle.ang_crt))))
         return tot_sum
 
-    def calculate_probability_ring(self):
-        ...
 if __name__ == "__main__":
     beta = np.pi/180*55
     fov = np.pi/180*45
