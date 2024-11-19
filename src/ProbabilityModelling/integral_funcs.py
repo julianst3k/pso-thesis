@@ -53,38 +53,71 @@ class NonOriginIntegrator:
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
         return (theta_top-theta_bot)*sum_int
-    def integral_lambdas_cosine(self, Dn):
-        a = self.consts["a"]
-        b = self.consts["b"]
-        cosfov = self.params.cosfov
-        sinbeta = self.params.sinbeta
-        sigma = Dn**2/self.params.b**2
-        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(np.tan(t)*np.sqrt(np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+ 
-        np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, 1/(1+sigma**2))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, 1/(1+sigma**2)))
+    def integral_lambdas_cosine(self, Dn, debug = False):
+        """
+            All the functions relation to solving the integral of the function Gn(Dn/cos(x))
+            Gn(x) = X(X^2+b^2)^0.5 + ln((X^2+b^2)^0.5+X) - X + X^2
+            Tested: Yes
+        """
+        if not debug:
+            a = self.consts["a"]
+            b = self.consts["b"]
+            cosfov = self.params.cosfov
+            sinbeta = self.params.sinbeta
+            sigma = Dn/self.params.b
+            ap = self.params.a 
+        else:
+            cosfov = 1
+            sinbeta = 1
+            a = 1
+            b = 1
+            sigma = Dn
+            ap = 1
+        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(np.tan(t)*np.sqrt(np.cos(2*t)+1+2*sigma**2)/np.sqrt(2)+ 
+        np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, (1/(1+sigma**2)))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, (1/(1+sigma**2)))))
         sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
-        sum_int_three = lambda t: self.params.a/sinbeta*Dn*self.log_cos(t)
+        sum_int_three = lambda t: ap/sinbeta*Dn*self.log_cos(t)
         sum_int_four = lambda t: b*Dn/2*np.tan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
-    def integral_lambdas_sine(self, Dn):
-        a = self.consts["a"]
-        b = self.consts["b"]
-        cosfov = self.params.cosfov
-        sinbeta = self.params.sinbeta
-        sigma = Dn**2/self.params.b**2
-        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(-cotan(t)*np.sqrt(-np.cos(2*t)+1+2*sigma**2)/np.sqrt(2))+
-        (sigma+1/sigma)*sp.special.ellipkinc(t, -1/sigma**4)-sigma*sp.special.ellipeinc(t, -1/sigma**4))
+    def integral_lambdas_sine(self, Dn, debug = False):
+        """
+            All the functions relation to solving the integral of the function Gn(Dn/sin(x))
+            Gn(x) = X(X^2+b^2)^0.5 + ln((X^2+b^2)^0.5+X) - X + X^2
+        """
+        if not debug:
+            a = self.consts["a"]
+            b = self.consts["b"]
+            cosfov = self.params.cosfov
+            sinbeta = self.params.sinbeta
+            sigma = Dn/self.params.b
+            ap = self.params.a 
+        else:
+            cosfov = 1
+            sinbeta = 1
+            a = 1
+            b = 1
+            sigma = Dn
+            ap = 1
+        sum_int_one = lambda t: (cosfov/sinbeta*a*Dn*b*(-cotan(t)*np.sqrt(-np.cos(2*t)+1+2*sigma**2)/np.sqrt(2)+
+        (sigma+1/sigma)*sp.special.ellipkinc(t, -1/sigma**2)-sigma*sp.special.ellipeinc(t, -1/sigma**2)))
         sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(x, tb, tt, Dn)
-        sum_int_three = lambda t: self.params.a/sinbeta*Dn*np.log(np.sin(t)/np.cos(t))
-        sum_int_four = lambda t: b*Dn/2*cotan(t)
+        sum_int_three = lambda t: ap/sinbeta*Dn*np.log(np.sin(t)/np.cos(t))
+        sum_int_four = lambda t: -b*Dn/2*cotan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
-    def sinh_int_cos(self, tb, tt, Dn, max_order = 10):
-        b = self.params.b 
+    def sinh_int_cos(self, tb, tt, Dn, max_order = 10, debug = True):
+        """
+        Tested: Yes, small error if Dn/b < 1, but nothing to do ...
+        integral of arcsinh(Dn/(bsin(x))) 
+        """
+        b = self.params.b if not debug else 1
         summation = 0
         multiplier = b**2
         if Dn < b:
             tm = np.arccos(Dn/b)
             if tt < tm:
                 tm = tt
+            if tm > tb:
+                tm = tb
             for order in range(max_order):
                 factor = 1/sp.special.factorial(order)
                 for j in range(order):
@@ -108,7 +141,7 @@ class NonOriginIntegrator:
         return summation*multiplier
     def sinh_int_sin(self, tb, tt, Dn, max_order = 10, debug = False):
         """
-        TODO: Test against Wolfram values
+        Tested: Yes, small error if Dn/b < 1, but nothing to do ...
         integral of arcsinh(Dn/(bsin(x))) 
         """
         b = self.params.b if not debug else 1
@@ -118,6 +151,8 @@ class NonOriginIntegrator:
             tm = np.arccos(Dn/b)
             if tt < tm:
                 tm = tt
+            if tm < tb:
+                tm = tb
             for order in range(max_order):
                 factor = 1/sp.special.factorial(order)
                 for j in range(order):
@@ -129,7 +164,7 @@ class NonOriginIntegrator:
                     factor *= (-1/2-j)
                 summation -= 1/(2*order)*factor*(self.f_sin(tm, order)-self.f_sin(tb, order))*(Dn/b)**(-2*order)
 
-            summation += np.log(2*Dn/b)*(tt-tm)-(self.f_logsin(tt)-self.f_logsin(tm))
+            summation += np.log(2*Dn/b)*(tm-tb)-(self.f_logsin(tm)-self.f_logsin(tb))
         else:
             summation += np.log(2*Dn/b)*(tt-tb)-(self.f_logsin(tt)-self.f_logsin(tb))
             for order in range(1,max_order):
@@ -306,5 +341,6 @@ if __name__=="__main__":
     X, Y, xc, yc = 5, 3, 1, 1
     rec = EightRectangle(X, Y, xc, yc)
     intrec = NonOriginIntegrator(1,2, None, None)
-    for Dn in np.arange(0.8,1.4, 0.2):
-        print([(x, intrec.sinh_int_sin(x, np.pi/2, Dn, debug = True)) for x in np.linspace(np.pi/10, np.pi/2, 10)])
+    for i in np.arange(0.8, 1.4, 0.2):
+        first_term, second_term, third_term, fourth_term = intrec.integral_lambdas_cosine(i, debug = True)
+        print([(x,first_term(x)-first_term(0)) for x in np.linspace(0, np.pi/3, 10)])
