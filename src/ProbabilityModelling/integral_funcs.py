@@ -204,7 +204,12 @@ class MISOOffsetIntegrator:
             summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
         return summ 
     def atan_lambdas(self, triang):
-        
+        """
+        TODO: Excepcion si x pasa por d. Si x pasa por d, entonces el logaritmo se indefine,
+        pero realmente la expresion general sera 0*infinito.
+        Solucion: Si x pasa por d, tomar un epsilon (0.01?) hacia arriba y hacia abajo, y asumir que la integral dentro del epsilon 
+        no contiene ese termino (ie termino 4) 
+        """
         def approx_val(x, d, tb):
             approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
             return approx_val, approx_der
@@ -217,8 +222,8 @@ class MISOOffsetIntegrator:
         lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+approx_der(x,d,avg)*(t**2/2-avg*t))
         lambda_list.append(lambda x, t: -(1/4*d**2*np.sin(2*t)*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
         lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
-        lambda_list.append(lambda x, t: -1/4*d**2*np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t)))
-        lambda_list.append(lambda x, t: -1/4*d*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)-(x**4+d**4)/(4*d**3*x**3)*log(x**2+d**2+2*d*L*cos(t))))
+        lambda_list.append(lambda x, t: -1/4*d**2*(np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t))-d*x*(x**4+d**4)/(4*d**3*x**3)*log(x**2+d**2+2*d*L*cos(t))))
+        lambda_list.append(lambda x, t: -1/4*d**3*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)))
         return lambda_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):
