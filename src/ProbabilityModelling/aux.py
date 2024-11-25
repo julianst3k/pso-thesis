@@ -1,7 +1,7 @@
 from abc import ABC
 import numpy as np
 from enum import Enum
-
+from integral_funcs import MISOOffsetIntegrator, MISOBaseIntegrator
 def cotan(ang):
     return 1/np.tan(ang)
 
@@ -211,6 +211,19 @@ class Interval:
         return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Consts: {self.consts}'
     def is_interval(self):
         return True
+    def integrate_lb(self, triang, parameters):
+        return self._integrate(triang, parameters, offset_lb, True)
+    def integrate_ub(self, triang, parameters):
+        return self._integrate(triang, parameters, offset_ub, False)
+    def _integrate(self, triang, parameters, offset, is_lb):
+        integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+        acos_integral = (-1)**(is_lb)*integrator.acos_integrator(triang)
+        angle_integral = -integrator.angle_integrator(triang)
+        if offset:
+            pi_const_integral = integrator.pi_const_integrator(triang)
+            return (-1)**(is_lb)*acos_integral+2*pi_const_integral+angle_integral
+        return (-1)**(is_lb)*acos_integral+angle_integral
+
 class OutOfUnitaryBound(Exception):
     ...
 class FunctionalInterval(Interval):
@@ -268,8 +281,21 @@ class OffsetInterval(Interval):
         divided_lb = self.lb
         self.lb = divider
         return OffsetInterval(self.offset_lb, self.offset_ub, divided_lb, divider, self.pivoted, self.upper_func, self.lower_func, self.consts, self.ub_over_pi)
-
-
+    def integrate_lb(self, triang, parameters):
+        return self._integrate(triang, parameters, offset_lb, False, True)
+    def integrate_ub(self, triang, parameters):
+        return self._integrate(triang, parameters, offset_ub, over_pi, False)
+    def _integrate(self, triang, parameters, offset, over_pi, is_lb):
+        integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+        acos_integral = integrator.acos_integrator(triang)
+        atan_integral = integrator.atan_integrator(triang)
+        if offset:
+            pi_const_integral = integrator.pi_const_integrator(triang)
+            if over_pi:
+                return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral-2*pi_const_integral
+            else:
+                return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
+        return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
 class ProbabilityCalculator(ABC):
     def __init__(self,fov, beta, h, r):
         self.r = r

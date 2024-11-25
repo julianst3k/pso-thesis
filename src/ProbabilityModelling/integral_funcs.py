@@ -18,6 +18,212 @@ def cos_power_primitive(n: int, x):
         return x
     else:
         return np.sin(x)*np.cos(x)**(n-1)/n - (n-1)/n * cos_power_primitive(n-2, x)
+
+class MISOOffsetIntegrator:
+    def __init__(self, lb, ub, consts, parameters):
+        self.lb = lb
+        self.ub = ub
+        self.consts = consts
+        self.params = parameters
+    def pi_const_integrator(self, triang):
+        theta_bot, theta_top = triang.ang_low, triang.ang_high
+        return (theta_top-theta_bot)*(self.ub**2-self.lb**2)*np.pi/2
+    def acos_integrator(self, triang):
+        # Los lambdas tienen distintas entradas por como se generan las soluciones :(
+        lambda_over_one_wrap, lambda_over_two_wrap, lambda_under_one_wrap, lambda_under_two_wrap = self._acos_lambda_wrapper() 
+        xb = self.lb
+        xt = self.ub
+        d = self.params.d
+        b = self.params.b
+        a = self.params.a
+        avg_t = triang.avg_ang
+        tb, tt = triang.ang_low, triang.ang_high
+        x_thresh_u, x_thresh_d = self.solve_b_u_threshold(avg_t, d, b)
+        """
+        Se genera un intervalo entre x_u y x_d, el cual se intersecta con [xb, xt]
+        
+        """
+        integr = 0
+        if xb > x_u or xt < x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
+            integr += lambda_over_one_wrap(xt, xb, tt, tb)
+            integr += lambda_over_two_wrap(xt, xb, tt, tb)
+        elif xt < x_u and xb > x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
+            integr += lambda_under_one_wrap(xt, xb, tt, tb)
+            integr += lambda_under_two_wrap(xt, xb, tt, tb)
+        elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
+            integr += lambda_under_one_wrap(x_u, xb, tt, tb)
+            integr += lambda_under_two_wrap(x_u, xb, tt, tb)
+            integr += lambda_over_one_wrap(xt, x_u, tt, tb)
+            integr += lambda_over_two_wrap(xt, x_u, tt, tb)
+        elif xt > x_d and xb < x_d: # [xb, x_d] sobre b, [x_d, xt] bajo b
+            integr += lambda_under_one_wrap(xt, x_d, tt, tb)
+            integr += lambda_under_two_wrap(xt, x_d, tt, tb)
+            integr += lambda_over_one_wrap(x_d, xb, tt, tb)
+            integr += lambda_over_two_wrap(x_d, xb, tt, tb)
+        lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
+        cosfov = self.params.cosfov
+        sinbeta = self.params.sinbeta
+        integr *= cosfov/sinbeta
+        aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
+        integr += a*(aux_integr)/(b*sinbeta)
+        integr *= self.consts["a"]
+        integr += self.consts["b"]/2*(xt**2-xb**2)*(tt-tb)
+        return integr
+    def _acos_lambda_wrapper(self, N = 10):
+        lambda_over_one, lambda_over_two = self.acos_lambda_over_b(N) # f(x,t), f(xt, xb, t)
+        lambda_under_one, lambda_under_two = self.acos_lambda_under_b() # f(x,t), f(x, tt, tb) 
+        lambda_over_one_wrap = lambda xt, xb, tt, tb: lambda_over_one(xt, tt)-lambda_over_one(xt,tb)-lambda_over_one(xb, tt)+lambda_over_one(xb, tb)
+        lambda_over_two_wrap = lambda xt, xb, tt, tb: lambda_over_two(xt, xb, tt)-lambda_over_two(xt, xb, tb)
+        lambda_under_one_wrap = lambda xt, xb, tt, tb: lambda_under_one(xt, tt)-lambda_under_one(xt,tb)-lambda_under_one(xb, tt)+lambda_under_one(xb, tb)
+        lambda_under_two_wrap = lambda xt, xb, tt, tb: lambda_under_two(xt, tt, tb)-lambda_under_two(xb, tt, tb)
+        return lambda_over_one_wrap, lambda_over_two_wrap, lambda_under_one_wrap, lambda_under_two_wrap
+    def solve_b_u_threshold(self, avg_t, d, b):
+        a = 1
+        b = 2*d*np.cos(avg_t)
+        c = d**2-b**2
+        if b**2-4*a*c >= 0
+            sol_one = (-b+np.sqrt(b**2-4*a*c))/(2*c)
+            sol_two = (-b-np.sqrt(b**2-4*a*c))/(2*c)
+        else:
+            """
+            Para que lo de arriba no ocurra, c > 0, lo que implica que siempre es mayor a b**2
+            """
+            return None, None
+
+    def acos_lambda_over_b(self, N = 10):
+        b = self.params.b
+        lambda_one = lambda x, t: 1/2*x**2*t
+        lambda_two = lambda xt, xb, t: b**2/4*self.arctan_acos_integral(xt,xb,t, N)
+        return lambda_one, lambda_two
+    def acos_lambda_under_b(self, use_discerner = True):
+        def sign_discerner(x,t,d,use_discerner):
+            multiplier = d*np.sin(t)
+            eta = 4*d*x/(x+d)**2
+            if t>np.pi or not use_discerner:
+                summ = np.log(x+d*np.cos(t)+np.log(x**2+2*d*x*np.cos(t)+d**2))-1
+                summ *= multiplier
+                summ += 3*(x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipeinc(t/2, eta)
+            elif t<=np.pi:
+                summ = np.log(-x-d*np.cos(t)+np.log(x**2+2*d*x*np.cos(t)+d**2))-1
+                summ *= multiplier
+                summ += (x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)-(x+d)*sp.special.ellipeinc(t/2, eta)
+            return summ
+        b = self.params.b
+        d = self.params.d
+        lambda_one = lambda x, t: b*sign_discerner(x,t,d, use_discerner)  
+        lambda_two = lambda x, tt, tb: self.x_dcos_ineq_integral(x, tt, tb, d)
+        return lambda_one, lambda_two
+    def x_dcos_ineq_integral(self, x, tt, tb, d):
+        def cos_expansion(x, d, t, N = 10):
+            summ = 0
+            for n in range(N):
+                summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+        lambda_upper = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(np.sin(t)**3/3*np.log(x)+
+        cos_expansion(x,d,t))
+        lambda_lower = lambda x, t: -x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.tan(t/2))+d*x**3/3*np.log(np.sin(t))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.tan(t/2)))
+        
+        if x >= -d*cos(tt):
+            summ = lambda_upper(x, tt)
+            if x >= -d*cos(tb):
+                summ -= lambda_upper(x, tb)
+            else:
+                tm = np.arccos(-L/d)
+                if tb > tm:
+                    tm = 2*np.pi-tm  
+                summ -= lambda_upper(x, tm)
+                summ -= lambda_lower(x, tm)
+                summ += lambda_lower(x, tb)
+        else:
+            if x >= -d*cos(tb):
+                summ -= lambda_upper(x, tb)
+                if tb > tm:
+                    tm = 2*np.pi-tm
+                summ += lambda_upper(x, tm)
+                summ += lambda_lower(x, tm)
+                summ -= lambda_lower(x, tt)
+
+            else:
+                summ -= lambda_lower(x, tt)-lambda_lower(x,tb)
+        return summ
+
+
+    def arctan_acos_integral(self, xt, xb, t, N):
+        """
+        Integral of 
+        log(xt^2+d^2+2dxtcos(t))-dcot(t)tan^-1(xt+dcos(t)/dsin(t)) 
+        """
+        def arctan_acos_sum(self, xt, xb, t, d, N):
+            xt_coef = (2*d*xt)/(xt**2+d**2)
+            xb_coef = (2*d*xb)/(xb**2+d**2)
+            summ = 0
+            for n in range(1,N+1):
+                summ += xt_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
+                summ -= xb_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
+            return summ
+        def arctan_tanh_expr(self, xt, xb, t, d):
+            eta = (xt*xb+d**2)/(2*d*(xt+xb))
+            multiplier = d/2*(xt-xb)/(xt+xb)
+            if eta**2 > 1:
+                summ = -2*eta/np.sqrt(eta**2-1)*np.arctanh((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2)**2)    
+            else:
+                summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2)**2)    
+            summ += t
+            return summ*multiplier
+        d = self.params.d
+        return arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2)) - arctan_tanh_expr(xt, xb, t, d)
+    def f_cos(self, t, order):
+        """
+            Tested: Yes
+            Integral of cos^(order)(x)
+        """
+        sum_base = np.sin(t)*np.cos(t)**(order-1)
+        summation = 0
+        multiplier = 1
+        if order == 0:
+            return t
+        for i in range(order):
+            if i==0:
+                multiplier *= 1/(order)
+            else:
+                multiplier *= (order-2*i+1)/(order-2*i)
+            summation += multiplier*np.cos(t)**(-2*i)
+        summation *= sum_base
+        summation += multiplier*t
+        return summation    
+    def atan_integral(self, integral):
+        ...
+    def acos_lambdas(self):
+        ...
+    def atan_lambdas(self):
+        ...
+class MISOBaseIntegrator:
+    def __init__(self, lb, ub, consts, parameters):
+        self.lb = lb
+        self.ub = ub
+        self.consts = consts
+        self.params = parameters
+    def acos_integrator(self, triang):
+        theta_bot, theta_top = triang.ang_low, triang.ang_high
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
+        sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
+        return (theta_top-theta_bot)*sum_int
+    def integral_lambdas_linear(self):
+        a = self.consts["a"]
+        b = self.consts["b"]
+        cosfov = self.params.cosfov
+        sinbeta = self.params.sinbeta
+        sum_int_a = lambda x: a*(0.5*cosfov/sinbeta*(x*np.sqrt(x**2+self.params.b**2)+self.params.b**2*np.ln(np.sqrt(x**2+self.params.b**2)+x)))
+        sum_int_b = lambda x: self.params.a/sinbeta*X
+        sum_int_c = lambda x: b*x**2
+        return sum_int_a, sum_int_b, sum_int_c
+    def angle_integrator(self, triang):
+        theta_bot, theta_top = triang.ang_low, triang.ang_high
+        return (theta_top**2-theta_bot**2)/2*(self.ub**2-self.lb**2)/2
+    def pi_const_integrator(self, triang):
+        theta_bot, theta_top = triang.ang_low, triang.ang_high
+        return (theta_top-theta_bot)*(self.ub**2-self.lb**2)*np.pi/2
+
+
 class NonOriginIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -349,8 +555,29 @@ class RectangleIntegrator:
     def non_origin_integrator(self, L1, L2, consts, parameters):
         integrator = NonOriginIntegrator(L1, L2, consts, parameters)
         return integrator
-
+class TriangleIntegrator:
+    def __init__(self, rect):
+        self.rect = rect
     
+    def _integrate(func):
+        def _integrator_wrapper(self, *args):
+            integrator = func(self, *args)
+            area = self.triang.get_area()
+            
+    def wrapper_integrator(self, list_of_lims, parameters):
+        X, Y = self.rect.X, self.rect.Y
+        area = X*Y
+        tot_int = 0
+        for triang, lims in list_of_lims:
+            for lim in lims:
+                interv_bot, interv_top = lim
+                integral = interv_top.integrate_ub(triang, parameters) - interv_bot.integrate_lb(triang, parameters)
+                tot_int += integral * triang.get_area()
+        return tot_int
+
+        
+            
+
 
 
 if __name__=="__main__":

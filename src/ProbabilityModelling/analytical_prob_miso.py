@@ -245,6 +245,8 @@ if __name__ == "__main__":
     #    print(f"Pair {i}:")
     #    print(pair[0])
     #    print(pair[1])
+    
     an_prob._interval_solver(an_prob.base_offset_pairs, 3.6)
+    print(an_prob.base_offset_pairs)
 
 
