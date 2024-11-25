@@ -190,12 +190,32 @@ class MISOOffsetIntegrator:
         summation *= sum_base
         summation += multiplier*t
         return summation    
-    def atan_integral(self, integral):
-        ...
-    def acos_lambdas(self):
-        ...
-    def atan_lambdas(self):
-        ...
+    def atan_integral(self, triang):
+        lambda_list = self.atan_lambdas(triang)
+        xt = self.ub
+        xb = self.lb
+        tt = triang.ang_high
+        tb = triang.ang_low
+        summ = 0
+        for lamb in lambda_list:
+            summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
+        return summ 
+    def atan_lambdas(self, triang):
+        def approx_val(x, d, tb):
+            approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
+            return approx_val, approx_der
+        def approx_der(x, d, tb):
+            approx_der = 1/(x**2+2*d*x*np.cos(tb)+d**2)*(x*d*np.cos(tb)+d**2)
+            return approx_der
+        d = self.params.d
+        avg = triang.avg_ang
+        lambda_list = []
+        lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+approx_der(x,d,avg)*(t**2/2-avg*t))
+        lambda_list.append(lambda x, t: -(1/4*d**2*np.sin(2*t)*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
+        lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
+        lambda_list.append(lambda x, t: -1/2*d**2*np.cos(2*t)/4*np.log(x**2+d**2+2*d*x*np.cos(t)))
+        lambda_list.append(lambda x, t: -1/2*d*x*(np.cos(2*t)/(2*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)-(x**4+d**4)/(2*d**3*x**3)*log(x**2+d**2+2*d*L*cos(t))))
+        return lambda_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
