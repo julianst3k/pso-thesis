@@ -1,6 +1,6 @@
 import numpy as np 
 import scipy as sp 
-from aux import EightRectangle
+from aux import UniformRectangle
 def cotan(x):
     return np.cos(x)/np.sin(x)
 
@@ -18,7 +18,9 @@ def cos_power_primitive(n: int, x):
         return x
     else:
         return np.sin(x)*np.cos(x)**(n-1)/n - (n-1)/n * cos_power_primitive(n-2, x)
-
+class ParamMocker:
+    def __init__(self, d):
+        self.d = d
 class MISOOffsetIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -44,22 +46,22 @@ class MISOOffsetIntegrator:
         
         """
         integr = 0
-        if xb > x_u or xt < x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
-            integr += lambda_over_one_wrap(xt, xb, tt, tb)
-            integr += lambda_over_two_wrap(xt, xb, tt, tb)
-        elif xt < x_u and xb > x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
+        if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
             integr += lambda_under_two_wrap(xt, xb, tt, tb)
+        elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
+            integr += lambda_over_one_wrap(xt, xb, tt, tb)
+            integr += lambda_over_two_wrap(xt, xb, tt, tb)
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
-            integr += lambda_under_one_wrap(x_u, xb, tt, tb)
-            integr += lambda_under_two_wrap(x_u, xb, tt, tb)
-            integr += lambda_over_one_wrap(xt, x_u, tt, tb)
-            integr += lambda_over_two_wrap(xt, x_u, tt, tb)
-        elif xt > x_d and xb < x_d: # [xb, x_d] sobre b, [x_d, xt] bajo b
-            integr += lambda_under_one_wrap(xt, x_d, tt, tb)
-            integr += lambda_under_two_wrap(xt, x_d, tt, tb)
-            integr += lambda_over_one_wrap(x_d, xb, tt, tb)
-            integr += lambda_over_two_wrap(x_d, xb, tt, tb)
+            integr += lambda_over_one_wrap(x_u, xb, tt, tb)
+            integr += lambda_over_two_wrap(x_u, xb, tt, tb)
+            integr += lambda_under_one_wrap(xt, x_u, tt, tb)
+            integr += lambda_under_two_wrap(xt, x_u, tt, tb)
+        elif xt >= x_d and xb < x_d: # [xb, x_d] sobre b, [x_d, xt] bajo b
+            integr += lambda_over_one_wrap(xt, x_d, tt, tb)
+            integr += lambda_over_two_wrap(xt, x_d, tt, tb)
+            integr += lambda_under_one_wrap(x_d, xb, tt, tb)
+            integr += lambda_under_two_wrap(x_d, xb, tt, tb)
         lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
@@ -81,7 +83,7 @@ class MISOOffsetIntegrator:
         a = 1
         b = 2*d*np.cos(avg_t)
         c = d**2-b**2
-        if b**2-4*a*c >= 0
+        if b**2-4*a*c >= 0:
             sol_one = (-b+np.sqrt(b**2-4*a*c))/(2*c)
             sol_two = (-b-np.sqrt(b**2-4*a*c))/(2*c)
         else:
@@ -192,17 +194,33 @@ class MISOOffsetIntegrator:
         return summation    
     def atan_integral(self, triang):
         """
-        Tested??? 
+        Tested = Kind of
         """
         lambda_list = self.atan_lambdas(triang)
         xt = self.ub
         xb = self.lb
         tt = triang.ang_high
-        tb = triang.ang_low
+        tb = triang.ang_low            
         summ = 0
-        for lamb in lambda_list:
-            summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
-        return summ 
+        d = self.params.d
+        subsum = np.zeros(3)
+        for i, lamb in enumerate(lambda_list):
+            presum = summ
+            if i == 4:
+                if np.abs(xt-d) >= 0.1:
+                    summ += lamb(xt, tt)-lamb(xt,tb)
+                if np.abs(xb-d) >= 0.1:
+                    summ -= lamb(xb, tt)-lamb(xb,tb)
+                subsum[2] += lamb(xt, tt)-lamb(xt,tb) if np.abs(xt-d) >= 0.1 else 0
+            else:
+                summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
+                if i < 2:
+                    subsum[0] += lamb(xt, tt)-lamb(xt,tb)
+                elif i == 2:
+                    subsum[1] += lamb(xt, tt)-lamb(xt,tb)
+                else:
+                    subsum[2] += lamb(xt, tt)-lamb(xt,tb)
+        return summ, subsum
     def atan_lambdas(self, triang):
         """
         TODO: Excepcion si x pasa por d. Si x pasa por d, entonces el logaritmo se indefine,
@@ -212,18 +230,18 @@ class MISOOffsetIntegrator:
         """
         def approx_val(x, d, tb):
             approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
-            return approx_val, approx_der
+            return approx_val
         def approx_der(x, d, tb):
             approx_der = 1/(x**2+2*d*x*np.cos(tb)+d**2)*(x*d*np.cos(tb)+d**2)
             return approx_der
         d = self.params.d
         avg = triang.avg_ang
         lambda_list = []
-        lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+approx_der(x,d,avg)*(t**2/2-avg*t))
+        lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+(x**2/2)*approx_der(x,d,avg)*(t**2/2-avg*t))
         lambda_list.append(lambda x, t: -(1/4*d**2*np.sin(2*t)*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
         lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
-        lambda_list.append(lambda x, t: -1/4*d**2*(np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t))-d*x*(x**4+d**4)/(4*d**3*x**3)*log(x**2+d**2+2*d*L*cos(t))))
-        lambda_list.append(lambda x, t: -1/4*d**3*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)))
+        lambda_list.append(lambda x, t: -1/4*d**2*(np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t))-d*x*(x**4+d**4)/(4*d**3*x**3)*np.log(x**2+d**2+2*d*x*np.cos(t))))
+        lambda_list.append(lambda x, t: 1/4*d**3*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)))
         return lambda_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):
@@ -610,9 +628,13 @@ class TriangleIntegrator:
 
 
 if __name__=="__main__":
-    X, Y, xc, yc = 5, 3, 1, 1
-    rec = EightRectangle(X, Y, xc, yc)
-    intrec = NonOriginIntegrator(1,2, None, None)
-    for i in np.arange(0.8, 1.4, 0.2):
-        first_term, second_term, third_term, fourth_term = intrec.integral_lambdas_cosine(i, debug = True)
-        print([(x,first_term(x)-first_term(0)) for x in np.linspace(0, np.pi/3, 10)])
+    X, Y, xc, yc = 5, 3, 3, 3
+    rec = UniformRectangle(X, Y, xc, yc, 180)
+    d = 1
+    mocker = ParamMocker(d)
+    lb = 1.1
+    ub = 1.5
+    intrec = MISOOffsetIntegrator(lb, ub, None, mocker)
+    for triang in rec:
+        integr, subsum = intrec.atan_integral(triang)
+        print(integr, subsum, triang.ang_low, triang.ang_high)
