@@ -216,6 +216,7 @@ class MISOOffsetIntegrator:
                 summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
                 if i < 2:
                     subsum[0] += lamb(xt, tt)-lamb(xt,tb)
+                    
                 elif i == 2:
                     subsum[1] += lamb(xt, tt)-lamb(xt,tb)
                 else:
@@ -238,7 +239,7 @@ class MISOOffsetIntegrator:
         avg = triang.avg_ang
         lambda_list = []
         lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+(x**2/2)*approx_der(x,d,avg)*(t**2/2-avg*t))
-        lambda_list.append(lambda x, t: -(1/4*d**2*np.sin(2*t)*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
+        lambda_list.append(lambda x, t: -(d**2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
         lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
         lambda_list.append(lambda x, t: -1/4*d**2*(np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t))-d*x*(x**4+d**4)/(4*d**3*x**3)*np.log(x**2+d**2+2*d*x*np.cos(t))))
         lambda_list.append(lambda x, t: 1/4*d**3*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)))
