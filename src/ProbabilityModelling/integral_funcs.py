@@ -117,7 +117,7 @@ class MISOOffsetIntegrator:
             return summ
         b = self.params.b
         d = self.params.d
-        lambda_one = lambda x, t: b*sign_discerner(x,t,d, use_discerner)  
+        lambda_one = lambda x, t: b*sign_discerner(x,t,d, use_discerner) # <- Tested 
         lambda_two = lambda x, tt, tb: self.x_dcos_ineq_integral(x, tt, tb, d)
         return lambda_one, lambda_two
     def x_dcos_ineq_integral(self, x, tt, tb, d):
