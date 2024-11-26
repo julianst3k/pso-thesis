@@ -19,8 +19,9 @@ def cos_power_primitive(n: int, x):
     else:
         return np.sin(x)*np.cos(x)**(n-1)/n - (n-1)/n * cos_power_primitive(n-2, x)
 class ParamMocker:
-    def __init__(self, d):
+    def __init__(self, d, b):
         self.d = d
+        self.b = b
 class MISOOffsetIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -98,15 +99,19 @@ class MISOOffsetIntegrator:
         lambda_two = lambda xt, xb, t: b**2/4*self.arctan_acos_integral(xt,xb,t, N)
         return lambda_one, lambda_two
     def acos_lambda_under_b(self, use_discerner = True):
+        """
+        Tested: Yes
+        """
         def sign_discerner(x,t,d,use_discerner):
             multiplier = d*np.sin(t)
             eta = 4*d*x/(x+d)**2
-            if t>np.pi or not use_discerner:
-                summ = np.log(x+d*np.cos(t)+np.log(x**2+2*d*x*np.cos(t)+d**2))-1
+            if t<np.pi or not use_discerner:
+                summ = np.log(x+d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
                 summ *= multiplier
-                summ += 3*(x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipeinc(t/2, eta)
-            elif t<=np.pi:
-                summ = np.log(-x-d*np.cos(t)+np.log(x**2+2*d*x*np.cos(t)+d**2))-1
+                summ += (x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)
+                print(sp.special.ellipkinc(t/2, eta), sp.special.ellipeinc(t/2, eta), eta, t/2)
+            elif t>=np.pi:
+                summ = np.log(-x-d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
                 summ *= multiplier
                 summ += (x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)-(x+d)*sp.special.ellipeinc(t/2, eta)
             return summ
@@ -194,7 +199,7 @@ class MISOOffsetIntegrator:
         return summation    
     def atan_integral(self, triang):
         """
-        Tested = Kind of
+        Tested = Necesito mas ejemplos pero por ahora esta bien
         """
         lambda_list = self.atan_lambdas(triang)
         xt = self.ub
@@ -453,7 +458,6 @@ class NonOriginIntegrator:
         if order > 0:
             sum_base *= 1/np.cos(t)**(2*order-1)
         else:
-            print(np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))))
             return np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
         summation = 0
         multiplier = 1
@@ -632,10 +636,10 @@ if __name__=="__main__":
     X, Y, xc, yc = 5, 3, 3, 3
     rec = UniformRectangle(X, Y, xc, yc, 180)
     d = 1
-    mocker = ParamMocker(d)
+    b = 1.2
+    mocker = ParamMocker(d,b)
     lb = 1.1
     ub = 1.5
     intrec = MISOOffsetIntegrator(lb, ub, None, mocker)
-    for triang in rec:
-        integr, subsum = intrec.atan_integral(triang)
-        print(integr, subsum, triang.ang_low, triang.ang_high)
+    one, two = intrec.acos_lambda_under_b()
+    print(one(1.5, 1.5)-one(1.5, 1))
