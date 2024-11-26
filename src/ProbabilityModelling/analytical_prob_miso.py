@@ -1,4 +1,5 @@
-from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval
+from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
+from interval import Interval, Bound, OffsetInterval
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq

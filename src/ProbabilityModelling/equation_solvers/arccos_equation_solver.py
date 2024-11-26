@@ -1,4 +1,5 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
+from interval import Interval, Bound, OffsetInterval
 import numpy as np
 from .interval_generator_solver import IntervalOffsetSolver
 class ArccosEquationSolver:

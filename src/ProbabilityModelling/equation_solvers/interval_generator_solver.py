@@ -1,4 +1,5 @@
-from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation, Interval, Bound, OffsetInterval, OutOfUnitaryBound
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
+from interval import Interval, Bound, OffsetInterval, OutOfUnitaryBound
 import numpy as np
 
 class IntervalOffsetSolver:

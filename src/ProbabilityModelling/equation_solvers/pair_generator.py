@@ -1,4 +1,5 @@
-from aux import NewtonRaphson, Interval, OffsetInterval
+from aux import NewtonRaphson
+from interval import Interval, OffsetInterval
 import numpy as np
 
 class PairGenerator:
