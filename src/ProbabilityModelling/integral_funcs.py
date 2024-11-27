@@ -44,7 +44,6 @@ class MISOOffsetIntegrator:
         x_thresh_u, x_thresh_d = self.solve_b_u_threshold(avg_t, d, b)
         """
         Se genera un intervalo entre x_u y x_d, el cual se intersecta con [xb, xt]
-        
         """
         integr = 0
         if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
@@ -123,15 +122,15 @@ class MISOOffsetIntegrator:
     def x_dcos_ineq_integral(self, x, tt, tb, d):
         def cos_expansion(x, d, t, N = 10):
             summ = 0
-            for n in range(N):
+            for n in range(1,N):
                 summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
         lambda_upper = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(np.sin(t)**3/3*np.log(x)+
         cos_expansion(x,d,t))
         lambda_lower = lambda x, t: -x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.tan(t/2))+d*x**3/3*np.log(np.sin(t))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.tan(t/2)))
         
-        if x >= -d*cos(tt):
+        if x >= -d*np.cos(tt):
             summ = lambda_upper(x, tt)
-            if x >= -d*cos(tb):
+            if x >= -d*np.cos(tb):
                 summ -= lambda_upper(x, tb)
             else:
                 tm = np.arccos(-L/d)
@@ -141,7 +140,7 @@ class MISOOffsetIntegrator:
                 summ -= lambda_lower(x, tm)
                 summ += lambda_lower(x, tb)
         else:
-            if x >= -d*cos(tb):
+            if x >= -d*np.cos(tb):
                 summ -= lambda_upper(x, tb)
                 if tb > tm:
                     tm = 2*np.pi-tm
@@ -188,14 +187,20 @@ class MISOOffsetIntegrator:
         multiplier = 1
         if order == 0:
             return t
-        for i in range(order):
+        print(order)
+        for i in range(order//2):
+            print(i)
             if i==0:
                 multiplier *= 1/(order)
             else:
                 multiplier *= (order-2*i+1)/(order-2*i)
             summation += multiplier*np.cos(t)**(-2*i)
+            
         summation *= sum_base
-        summation += multiplier*t
+        if order % 2:
+            summation += multiplier*np.sin(t)
+        else:
+            summation += multiplier*t
         return summation    
     def atan_integral(self, triang):
         """
@@ -641,5 +646,9 @@ if __name__=="__main__":
     lb = 1.1
     ub = 1.5
     intrec = MISOOffsetIntegrator(lb, ub, None, mocker)
-    one, two = intrec.acos_lambda_under_b()
-    print(one(1.5, 1.5)-one(1.5, 1))
+    t = 1
+    for i in range(10):
+        fcos = intrec.f_cos(t, i)-intrec.f_cos(0, i)
+        print(fcos)
+    #one, two = intrec.acos_lambda_under_b()
+    #print(two(1.5, 1.5,1))
