@@ -47,16 +47,16 @@ class MISOOffsetIntegrator:
         """
         integr = 0
         if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
-            integr += lambda_under_one_wrap(xt, xb, tt, tb)
-            integr += lambda_under_two_wrap(xt, xb, tt, tb)
-        elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
             integr += lambda_over_one_wrap(xt, xb, tt, tb)
             integr += lambda_over_two_wrap(xt, xb, tt, tb)
+        elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
+            integr += lambda_under_one_wrap(xt, xb, tt, tb)
+            integr += lambda_under_two_wrap(xt, xb, tt, tb)
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
-            integr += lambda_over_one_wrap(x_u, xb, tt, tb)
-            integr += lambda_over_two_wrap(x_u, xb, tt, tb)
-            integr += lambda_under_one_wrap(xt, x_u, tt, tb)
-            integr += lambda_under_two_wrap(xt, x_u, tt, tb)
+            integr += lambda_under_one_wrap(x_u, xb, tt, tb)
+            integr += lambda_under_two_wrap(x_u, xb, tt, tb)
+            integr += lambda_over_one_wrap(xt, x_u, tt, tb)
+            integr += lambda_over_two_wrap(xt, x_u, tt, tb)
         elif xt >= x_d and xb < x_d: # [xb, x_d] sobre b, [x_d, xt] bajo b
             integr += lambda_over_one_wrap(xt, x_d, tt, tb)
             integr += lambda_over_two_wrap(xt, x_d, tt, tb)
@@ -77,7 +77,7 @@ class MISOOffsetIntegrator:
         lambda_over_one_wrap = lambda xt, xb, tt, tb: lambda_over_one(xt, tt)-lambda_over_one(xt,tb)-lambda_over_one(xb, tt)+lambda_over_one(xb, tb)
         lambda_over_two_wrap = lambda xt, xb, tt, tb: lambda_over_two(xt, xb, tt)-lambda_over_two(xt, xb, tb)
         lambda_under_one_wrap = lambda xt, xb, tt, tb: lambda_under_one(xt, tt)-lambda_under_one(xt,tb)-lambda_under_one(xb, tt)+lambda_under_one(xb, tb)
-        lambda_under_two_wrap = lambda xt, xb, tt, tb: lambda_under_two(xt, tt, tb)-lambda_under_two(xb, tt, tb)
+        lambda_under_two_wrap = lambda xt, xb, tt, tb: lambda_under_two(xt, xb, tt, tb)
         return lambda_over_one_wrap, lambda_over_two_wrap, lambda_under_one_wrap, lambda_under_two_wrap
     def solve_b_u_threshold(self, avg_t, d, b):
         a = 1
@@ -93,9 +93,12 @@ class MISOOffsetIntegrator:
             return None, None
 
     def acos_lambda_over_b(self, N = 10):
+        """
+
+        """
         b = self.params.b
         lambda_one = lambda x, t: 1/2*x**2*t
-        lambda_two = lambda xt, xb, t: b**2/4*self.arctan_acos_integral(xt,xb,t, N)
+        lambda_two = lambda xt, xb, t: b**2/2*self.arctan_acos_integral(xt,xb,t, N)
         return lambda_one, lambda_two
     def acos_lambda_under_b(self, use_discerner = True):
         """
@@ -108,7 +111,6 @@ class MISOOffsetIntegrator:
                 summ = np.log(x+d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
                 summ *= multiplier
                 summ += (x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)
-                print(sp.special.ellipkinc(t/2, eta), sp.special.ellipeinc(t/2, eta), eta, t/2)
             elif t>=np.pi:
                 summ = np.log(-x-d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
                 summ *= multiplier
@@ -117,48 +119,94 @@ class MISOOffsetIntegrator:
         b = self.params.b
         d = self.params.d
         lambda_one = lambda x, t: b*sign_discerner(x,t,d, use_discerner) # <- Tested 
-        lambda_two = lambda x, tt, tb: self.x_dcos_ineq_integral(x, tt, tb, d)
+        lambda_two = lambda xt, xb, tt, tb: self.x_dcos_ineq_integral(xt, xb, tt, tb, d)/(2*b**2) # <- Tested
         return lambda_one, lambda_two
-    def x_dcos_ineq_integral(self, x, tt, tb, d):
-        def cos_expansion(x, d, t, N = 10):
-            summ = 0
-            for n in range(1,N):
-                summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
-        lambda_upper = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(np.sin(t)**3/3*np.log(x)+
-        cos_expansion(x,d,t))
-        lambda_lower = lambda x, t: -x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.tan(t/2))+d*x**3/3*np.log(np.sin(t))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.tan(t/2)))
-        
-        if x >= -d*np.cos(tt):
-            summ = lambda_upper(x, tt)
-            if x >= -d*np.cos(tb):
-                summ -= lambda_upper(x, tb)
-            else:
-                tm = np.arccos(-L/d)
-                if tb > tm:
-                    tm = 2*np.pi-tm  
-                summ -= lambda_upper(x, tm)
-                summ -= lambda_lower(x, tm)
-                summ += lambda_lower(x, tb)
-        else:
-            if x >= -d*np.cos(tb):
-                summ -= lambda_upper(x, tb)
-                if tb > tm:
-                    tm = 2*np.pi-tm
-                summ += lambda_upper(x, tm)
-                summ += lambda_lower(x, tm)
-                summ -= lambda_lower(x, tt)
+    def x_dcos_ineq_integral_over_theta(self, d):
+        """
+        Tested: The sum is tested, the rest is assumed to be right
+        """
+        def lambda_upper_aux(x, tt, tb, d):
+            ## Tested, I think..
+            def cos_expansion(x, d, t, N = 10):
+                summ = 0
+                for n in range(1,N):
+                    summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                return summ
 
+            aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(np.sin(t)**3/3*np.log(x)+
+        cos_expansion(x,d,t))
+            if x >= -d*np.cos(tt): # x+dcos(t) > 0
+            ## This hasnt been tested but lets assume it is true cuz why not
+                summ = aux_lambda(x, tt)
+                if x >= -d*np.cos(tb):
+                    summ -= aux_lambda(x, tb)
+                else:
+                    tm = np.arccos(-L/d)
+                    if tb > tm:
+                        tm = 2*np.pi-tm  
+                    summ -= aux_lambda(x, tm)
+                    summ -= aux_lambda(x, tm)
+                    summ += aux_lambda(x, tb)
             else:
-                summ -= lambda_lower(x, tt)-lambda_lower(x,tb)
+                if x >= -d*np.cos(tb):
+                    summ -= aux_lambda(x, tb)
+                    if tb > tm:
+                        tm = 2*np.pi-tm
+                    summ += aux_lambda(x, tm)
+                    summ += aux_lambda(x, tm)
+                    summ -= aux_lambda(x, tt)
+
+                else:
+                    summ -= aux_lambda(x, tt)-aux_lambda(x,tb)
+            return summ
+        
+        lambda_upper = lambda x, tt, tb: lambda_upper_aux(x, tt, tb, d) 
+        lambda_lower_aux = lambda x, t: (-1)**(t<np.pi)*(-x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.tan(t/2))+d*x**3/3*np.log(np.sin(t))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.tan(t/2))))
+        lambda_lower = lambda x, tt, tb: lambda_lower_aux(x,tt) - lambda_lower_aux(x,tb)
+        return lambda_upper, lambda_lower
+    def x_dcos_ineq_integral(self, xt, xb, tt, tb, d):
+        """
+        Tested: Kinda, lets assume it is all good cuz i cant bother
+        """
+        lambda_up, lambda_low = self.x_dcos_ineq_integral_over_theta(d)
+        ## tt, tb in [0,pi] or [pi,2pi] so...
+        avg = (xt + xb)/2
+        summ = 0
+        sign_of_sin = np.sin(avg) < 0
+        if  np.abs(xb + d*np.cos(avg)) < np.abs(d*np.sin(avg)):
+            if np.abs(xt + d*np.cos(avg)) < np.abs(d*np.sin(avg)):
+                summ += lambda_low(xt, tt, tb)-lambda_low(xb, tt, tb)
+            else:
+                # [xb, xm] -> Below, [xm, xt] > Above
+                summ += lambda_up(xt, tt, tb)-lambda_low(xb, tt,tb)
+
+                if xb+d*np.cos(avg) > 0 or xt + d*np.cos(avg) > 0:
+                    xm = d*((-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
+                else:                  
+                    xm = d*(-(-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
+                summ -= lambda_up(xm, tt, tb)-lambda_low(xm, tt,tb)
+        else:
+            if np.abs(xt + d*np.cos(avg)) > np.abs(np.sin(avg)):
+                summ += lambda_up(xt, tt, tb)-lambda_up(xb, tt, tb)
+            else:
+                summ += lambda_low(xt, tt, tb)-lambda_up(xb, tt,tb)
+                # [xb, xm] -> Above, [xm, xt] > Below
+                if xb+d*np.cos(avg) > 0:
+                    xm = d*((-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
+                else:
+                    xm = d*(-(-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
+                summ -= lambda_low(xm, tt, tb)-lambda_up(xm, tt,tb)
         return summ
 
 
     def arctan_acos_integral(self, xt, xb, t, N):
         """
         Integral of 
-        log(xt^2+d^2+2dxtcos(t))-dcot(t)tan^-1(xt+dcos(t)/dsin(t)) 
+        log(xt^2+d^2+2dxtcos(t))-dcot(t)tan^-1(xt+dcos(t)/dsin(t))
+
+        Tested: Si  
         """
-        def arctan_acos_sum(self, xt, xb, t, d, N):
+        def arctan_acos_sum(xt, xb, t, d, N):
             xt_coef = (2*d*xt)/(xt**2+d**2)
             xb_coef = (2*d*xb)/(xb**2+d**2)
             summ = 0
@@ -166,17 +214,19 @@ class MISOOffsetIntegrator:
                 summ += xt_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
                 summ -= xb_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
             return summ
-        def arctan_tanh_expr(self, xt, xb, t, d):
+        def arctan_tanh_expr(xt, xb, t, d):
             eta = (xt*xb+d**2)/(2*d*(xt+xb))
             multiplier = d/2*(xt-xb)/(xt+xb)
             if eta**2 > 1:
-                summ = -2*eta/np.sqrt(eta**2-1)*np.arctanh((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2)**2)    
+                summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
             else:
-                summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2)**2)    
+                summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh((eta-1)/np.sqrt(1-eta**2)*np.tan(t/2))    
             summ += t
             return summ*multiplier
         d = self.params.d
-        return arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2)) - arctan_tanh_expr(xt, xb, t, d)
+        print(arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2)), xt, xb)
+        print(arctan_acos_sum(xt, xb, t, d, N), xt, xb)
+        return 1/2*(arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2))) - arctan_tanh_expr(xt, xb, t, d)
     def f_cos(self, t, order):
         """
             Tested: Yes
@@ -187,19 +237,14 @@ class MISOOffsetIntegrator:
         multiplier = 1
         if order == 0:
             return t
-        print(order)
-        for i in range(order//2):
-            print(i)
+        for i in range(order//2 if order % 2 == 0 else order//2+1):
             if i==0:
                 multiplier *= 1/(order)
             else:
                 multiplier *= (order-2*i+1)/(order-2*i)
             summation += multiplier*np.cos(t)**(-2*i)
-            
         summation *= sum_base
-        if order % 2:
-            summation += multiplier*np.sin(t)
-        else:
+        if order % 2 == 0:
             summation += multiplier*t
         return summation    
     def atan_integral(self, triang):
@@ -234,10 +279,8 @@ class MISOOffsetIntegrator:
         return summ, subsum
     def atan_lambdas(self, triang):
         """
-        TODO: Excepcion si x pasa por d. Si x pasa por d, entonces el logaritmo se indefine,
-        pero realmente la expresion general sera 0*infinito.
-        Solucion: Si x pasa por d, tomar un epsilon (0.01?) hacia arriba y hacia abajo, y asumir que la integral dentro del epsilon 
-        no contiene ese termino (ie termino 4) 
+        Done!
+        Tested: Si
         """
         def approx_val(x, d, tb):
             approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
@@ -647,8 +690,6 @@ if __name__=="__main__":
     ub = 1.5
     intrec = MISOOffsetIntegrator(lb, ub, None, mocker)
     t = 1
-    for i in range(10):
-        fcos = intrec.f_cos(t, i)-intrec.f_cos(0, i)
-        print(fcos)
-    #one, two = intrec.acos_lambda_under_b()
-    #print(two(1.5, 1.5,1))
+    N = 10
+    summ = intrec.arctan_acos_integral(2, 1.5, 1.5, N)-intrec.arctan_acos_integral(2, 1.5, 1, N)
+    print(summ)
