@@ -19,9 +19,10 @@ def cos_power_primitive(n: int, x):
     else:
         return np.sin(x)*np.cos(x)**(n-1)/n - (n-1)/n * cos_power_primitive(n-2, x)
 class ParamMocker:
-    def __init__(self, d, b):
+    def __init__(self, d, b, a):
         self.d = d
         self.b = b
+        self.a = a
 class MISOOffsetIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -41,7 +42,7 @@ class MISOOffsetIntegrator:
         a = self.params.a
         avg_t = triang.avg_ang
         tb, tt = triang.ang_low, triang.ang_high
-        x_thresh_u, x_thresh_d = self.solve_b_u_threshold(avg_t, d, b)
+        x_u, x_d = self.solve_b_u_threshold(avg_t, d, b)
         """
         Se genera un intervalo entre x_u y x_d, el cual se intersecta con [xb, xt]
         """
@@ -86,6 +87,7 @@ class MISOOffsetIntegrator:
         if b**2-4*a*c >= 0:
             sol_one = (-b+np.sqrt(b**2-4*a*c))/(2*c)
             sol_two = (-b-np.sqrt(b**2-4*a*c))/(2*c)
+            return sol_one, sol_two
         else:
             """
             Para que lo de arriba no ocurra, c > 0, lo que implica que siempre es mayor a b**2
@@ -684,12 +686,15 @@ if __name__=="__main__":
     X, Y, xc, yc = 5, 3, 3, 3
     rec = UniformRectangle(X, Y, xc, yc, 180)
     d = 1
-    b = 1.2
-    mocker = ParamMocker(d,b)
+    b = 1.44
+    a = 0.65
+    mocker = ParamMocker(d,b,a)
     lb = 1.1
     ub = 1.5
     intrec = MISOOffsetIntegrator(lb, ub, None, mocker)
     t = 1
     N = 10
-    summ = intrec.arctan_acos_integral(2, 1.5, 1.5, N)-intrec.arctan_acos_integral(2, 1.5, 1, N)
-    print(summ)
+    for triang in rec:
+        if triang.avg_ang > 0.9 and triang.avg_ang < 1.1:
+            print(intrec.acos_integrator(triang), triang.ang_low, triang.ang_high, lb, ub)
+
