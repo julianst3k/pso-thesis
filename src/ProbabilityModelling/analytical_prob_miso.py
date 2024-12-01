@@ -1,5 +1,5 @@
-from aux import cotan, OutOfUnitaryBound, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
-from interval import Interval, Bound, OffsetInterval
+from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
+from interval import Interval, Bound, OffsetInterval, OutOfUnitaryBound
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
@@ -15,6 +15,7 @@ class AnalyticalMISO(AnalyticalProbability):
     def _solve_lims_offset(self, theta=None):
         thresh_solver = eq.ThresholdSolver(self.threshs)
         self.offset_lims = thresh_solver.solve_lims_offset(self, theta)
+        
     def _modulus_solver(func):
         def _modulus_wrapper(self, *args, **kwargs):
             output, divider = func(self, *args, **kwargs)
@@ -38,6 +39,7 @@ class AnalyticalMISO(AnalyticalProbability):
         #self.print_intervals(self.sol_base_equations)
         #self.print_intervals(self.sol_offset_equations)
         self.sol_base_equations = self.divide_by_lims(self.sol_base_equations, self.lims)
+        print([str(lim) for lim in self.offset_lims])
         self.sol_offset_equations = self.divide_by_lims(self.sol_offset_equations, self.offset_lims)
         if theta is not None:
             self.base_offset_pairs = self.interval_fitting(self.sol_base_equations, self.sol_offset_equations)
@@ -65,6 +67,7 @@ class AnalyticalMISO(AnalyticalProbability):
 
     def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
         if np.abs((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)) > 1:
+            print(L, theta, (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))
             raise OutOfUnitaryBound
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
 
@@ -101,6 +104,8 @@ class AnalyticalMISO(AnalyticalProbability):
                 if curr.lb < lim.low:
                     _ = curr.inverse_divided_interval(lim.low)
                 if lim.low <= curr.ub:
+                    if lim.high < curr.lb:
+                        break
                     curr.set_consts(lim.const)
                     if lim.high < curr.ub and lim.high > curr.lb:
                         added_interval = curr.inverse_divided_interval(lim.high)
@@ -123,10 +128,14 @@ class AnalyticalMISO(AnalyticalProbability):
         """
         current_interval = 0
         return_interval = []
+        print("First Set:", [str(fset) for fset in first_set])
+        print("Second Set:", [str(sset) for sset in second_set])
         for i, inter in enumerate(first_set):
             not_completed = current_interval < len(second_set)
+            print("First:", inter)
             while not_completed:
                 curr = second_set[current_interval]
+                print("Second:", curr)
                 if inter.ub < curr.ub:
                     if inter.ub < curr.lb:
                         """
@@ -155,6 +164,9 @@ class AnalyticalMISO(AnalyticalProbability):
     def _interval_solver(self, interval_pairs, theta):
         output = []
         for interval_pair in interval_pairs:
+            print(interval_pair[0], interval_pair[1])
+        for interval_pair in interval_pairs:
+
             base_pair = interval_pair[0]
             offset_pair = interval_pair[1]
             solver = eq.PairGenerator(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
@@ -219,6 +231,7 @@ class AnalyticalMISO(AnalyticalProbability):
             return -base_derivative+offset_derivative_arccos+offset_derivative_tan
         else:
             return base_derivative-offset_derivative_arccos+offset_derivative_tan
+    
 
 
     
@@ -240,14 +253,13 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     angles = np.linspace(0, 2*np.pi, 10)
-    an_prob._solve_lims_offset(3.6)
-    an_prob._interval_fit(3.6)
-    #for i, pair in enumerate(an_prob.base_offset_pairs):
-    #    print(f"Pair {i}:")
-    #    print(pair[0])
-    #    print(pair[1])
-    
-    an_prob._interval_solver(an_prob.base_offset_pairs, 3.6)
-    print(an_prob.base_offset_pairs)
+    an_prob._solve_lims_offset(1.5)
+    an_prob._interval_fit(1.5)
+    for i, pair in enumerate(an_prob.base_offset_pairs):
+        print(f"Pair {i}:")
+        print(pair[0])
+        print(pair[1])
+    #an_prob._interval_solver(an_prob.base_offset_pairs, 1.5)
+    #print(an_prob.base_offset_pairs)
 
 
