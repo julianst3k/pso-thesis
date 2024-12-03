@@ -55,20 +55,20 @@ class ArccosEquationSolver:
         def triangle_wrapper(*args, **kwargs):
             sol_equations = {}
             for triangle in kwargs.get("triangles"):
+                print(kwargs.get("lims"))
                 lmin = kwargs.get("lims")[triangle][0].low
-                sol_equations[triangle] = func(self, *args, **kwargs)
                 theta = triangle.avg_ang
-            return sol_base_equations 
+                sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin)
+            return sol_equations 
+        return triangle_wrapper
     @solve_equations_triangle_wrapper
-    def solve_base_equations_triangles(self, triangles, parameters, lims):
-        sol_base_equations = self.solve_base_equations(parameters, theta, lmin)
+    def solve_base_equations_triangles(self, parameters, theta, lmin):
         
-        return sol_base_equations
+        return self.solve_base_equations(parameters, theta, lmin)
     @solve_equations_triangle_wrapper
-    def solve_offset_equations_triangles(self, triangles, parameters, lims):
-        sol_offset_equations = self.solve_offset_equations(parameters, theta, lmin)
+    def solve_offset_equations_triangles(self, parameters, theta, lmin):
             
-        return sol_offset_equations
+        return self.solve_offset_equations(parameters, theta, lmin)
     
     def _solve_quadratic_base(self, a, b, c, theta, parameters, lmin):
         """

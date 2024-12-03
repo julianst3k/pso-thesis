@@ -53,11 +53,13 @@ class AnalyticalMISO(AnalyticalProbability):
     @_modulus_solver
     def _solve_base_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
+        
         if theta is not None:
             lmin = self.lims[0].low
             return base_solver.solve_base_equations(self, theta, lmin), None
         else:
-            return base_solver.solve_base_equations_triangles(self.rect, self, self.lims), self.lims
+            self._remap_lims_to_triangles()
+            return base_solver.solve_base_equations_triangles(triangles=self.rect, parameters=self, lims=self.lims), self.lims
     @_modulus_solver
     def _solve_offset_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
@@ -65,8 +67,13 @@ class AnalyticalMISO(AnalyticalProbability):
             lmin = self.offset_lims[0].low
             return base_solver.solve_offset_equations(self, theta, lmin), None
         else:
-            return base_solver.solve_offset_equations_triangles(self.rect, self, self.offset_lims), self.offset_lims
-
+            return base_solver.solve_offset_equations_triangles(triangles=self.rect, parameters=self, lims=self.offset_lims), self.offset_lims
+    def _remap_lims_to_triangles(self):
+        aux_array = [lim for lim in self.lims]
+        self.lims = {}
+        for triangle in self.rect:
+            self.lims[triangle] = aux_array
+        
     def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
         if np.abs((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)) > 1:
             raise OutOfUnitaryBound
