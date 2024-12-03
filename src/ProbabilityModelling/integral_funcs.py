@@ -19,10 +19,12 @@ def cos_power_primitive(n: int, x):
     else:
         return np.sin(x)*np.cos(x)**(n-1)/n - (n-1)/n * cos_power_primitive(n-2, x)
 class ParamMocker:
-    def __init__(self, d, b, a):
+    def __init__(self, d, b, a, cosfov, sinbeta):
         self.d = d
         self.b = b
         self.a = a
+        self.cosfov = cosfov
+        self.sinbeta = sinbeta
 class MISOOffsetIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -688,7 +690,9 @@ if __name__=="__main__":
     d = 1
     b = 1.44
     a = 0.65
-    mocker = ParamMocker(d,b,a)
+    cosfov = 0.5
+    sinbeta = 0.5
+    mocker = ParamMocker(d,b,a,cosfov,sinbeta)
     lb = 1.1
     ub = 1.5
     intrec = MISOOffsetIntegrator(lb, ub, None, mocker)

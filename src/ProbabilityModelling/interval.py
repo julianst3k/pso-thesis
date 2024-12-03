@@ -39,7 +39,7 @@ class Interval:
     def set_consts(self, consts):
         self.consts = consts
     def __str__(self):
-        return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Consts: {self.consts}'
+        return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Consts: {self.consts}, Is_Offset: {self.is_offset}'
     def is_interval(self):
         return True
     def integrate_lb(self, triang, parameters):
@@ -127,3 +127,7 @@ class OffsetInterval(Interval):
             else:
                 return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
         return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
+    def _integrate_debug(self, triang, parameters, offset, over_pi, is_lb):
+        integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+        acos_integral = integrator.acos_integrator(triang)
+        print(acos_integral)

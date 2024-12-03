@@ -59,12 +59,12 @@ class ArccosEquationSolver:
                 sol_equations[triangle] = func(self, *args, **kwargs)
                 theta = triangle.avg_ang
             return sol_base_equations 
-            
+    @solve_equations_triangle_wrapper
     def solve_base_equations_triangles(self, triangles, parameters, lims):
         sol_base_equations = self.solve_base_equations(parameters, theta, lmin)
         
         return sol_base_equations
-
+    @solve_equations_triangle_wrapper
     def solve_offset_equations_triangles(self, triangles, parameters, lims):
         sol_offset_equations = self.solve_offset_equations(parameters, theta, lmin)
             
