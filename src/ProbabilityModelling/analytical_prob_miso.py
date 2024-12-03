@@ -21,17 +21,27 @@ class AnalyticalMISO(AnalyticalProbability):
             output, divider = func(self, *args, **kwargs)
             if divider is not None:
                 for triangle in self.rect:
-                    self._sort_intervals_by_lb(output)
+                    self._sort_intervals_by_lb(output[triangle])
                     output[triangle] = self.divide_by_lims(output[triangle], divider[triangle] if triangle in divider else divider)
             return output
         return _modulus_wrapper    
     def _generate_sol_offset_equations(self, theta = None):
         self.sol_offset_equations = self._solve_offset_wrapper(theta)
-        self._sort_intervals_by_lb(self.sol_offset_equations)
+        if theta is not None:
+            self._sort_intervals_by_lb(self.sol_offset_equations)
+        else:
+            for triangle in self.rect:
+                self._sort_intervals_by_lb(self.sol_offset_equations[triangle])
 
     def _generate_sol_base_equations(self, theta = None):
         self.sol_base_equations = self._solve_base_wrapper(theta)
-        self._sort_intervals_by_lb(self.sol_base_equations)
+        if theta is not None:
+            self._sort_intervals_by_lb(self.sol_base_equations)
+        else:
+            for triangle in self.rect:
+                self._sort_intervals_by_lb(self.sol_base_equations[triangle])
+
+
     
     def _interval_divide(self, theta = None):
         self._solve_lims_offset(theta)
@@ -75,11 +85,14 @@ class AnalyticalMISO(AnalyticalProbability):
             self.lims[triangle] = aux_array
         
     def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
-        if np.abs((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)) > 1:
+        epsilon = 0.001 # Relevant to avoid floating problems
+        acos_arg = (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)
+        if acos_arg > 1+epsilon:
+            print(acos_arg, L)
             raise OutOfUnitaryBound
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
-
-        return 2*np.pi*is_offset*(-1)**negative_mod + neg*np.arccos((self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta))-off
+        acos_arg = max(min(1, acos_arg),-1)
+        return 2*np.pi*is_offset*(-1)**negative_mod + neg*np.arccos(acos_arg)-off
     def eq_offset_int(self, L, interval, theta, offset):
         sign = (-1)**(interval.is_neg)
         return self.eq_offset(L, theta, sign, interval.pivoted, offset, interval.ub_over_pi)
@@ -237,7 +250,7 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            print([interv for interv in self.sol_offset_equations[triangle]])
+            print([interv for interv in self.sol_offset_equations[triang]])
 
     
 if __name__ == "__main__":

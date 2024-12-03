@@ -1,5 +1,5 @@
 from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
-from interval import Interval, Bound, OffsetInterval
+from interval import Interval, Bound, OffsetInterval, OutOfUnitaryBound
 import numpy as np
 from .interval_generator_solver import IntervalOffsetSolver
 class ArccosEquationSolver:
@@ -27,6 +27,8 @@ class ArccosEquationSolver:
             b = (2*d*parameters.cosfov**2-2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
             c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2-2*parameters.a*d*parameters.sinbeta
             L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= -d/np.cos(theta), lmin = -d/np.cos(theta))
+            if flagu is None:
+                pivot = None
         output = interval_solver.offset_intervals_solver(L1bp, L2bp, L1ap, L2ap, pivot, theta, parameters, flagl, flagu)
 
         return output
@@ -55,7 +57,6 @@ class ArccosEquationSolver:
         def triangle_wrapper(*args, **kwargs):
             sol_equations = {}
             for triangle in kwargs.get("triangles"):
-                print(kwargs.get("lims"))
                 lmin = kwargs.get("lims")[triangle][0].low
                 theta = triangle.avg_ang
                 sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin)
@@ -101,7 +102,7 @@ class ArccosEquationSolver:
         sols = [L1, L2]
         i = 0
         while i < 2:
-            if sols[i] is not None and np.abs(parameters.arg_acos(sols[i]+0.001)) >= 1 or np.abs(parameters.arg_acos(sols[i]-0.001)) >= 1:   
+            if sols[i] is not None and (np.abs(parameters.arg_acos(sols[i]+0.001)) >= 1 or np.abs(parameters.arg_acos(sols[i]-0.001)) >= 1):   
                 if len(sols) > i+1 and sols[i+1] is not None:
                     sols[i] = sols[i+1]
                     sols[i+1] = None
@@ -111,7 +112,7 @@ class ArccosEquationSolver:
             else:
                 i += 1
         L1, L2 = sols[0], sols[1]
-        if L1 < 0:
+        if L1 is None or L1 < 0:
             ub = parameters.eq_base(lmin, theta)
             lb = parameters.eq_base(lmin, theta,neg=-1)
             """
@@ -181,12 +182,16 @@ class ArccosEquationSolver:
         L2_is_lb = False
         L1_is_lb = False
         L1_is_ub = False
+        print(theta, L1, L2, pivot_point)
         if L1 < lmin if not pivot else pivot_point:
-            ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
-            lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
             """
                 As we saw before, it can only be below np.pi!
             """
+            try:
+                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
+                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
+            except OutOfUnitaryBound:
+                return None, None, None
             return lb < -np.pi, ub < -np.pi, 0
         else:
             if np.abs(parameters.eq_offset(L1, theta, pivot = pivot)+np.pi)>epsilon and np.abs(parameters.eq_offset(L1, theta, pivot = pivot)-np.pi)>epsilon:
