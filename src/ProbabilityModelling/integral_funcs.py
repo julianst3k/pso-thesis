@@ -145,14 +145,16 @@ class MISOOffsetIntegrator:
                 if x >= -d*np.cos(tb):
                     summ -= aux_lambda(x, tb)
                 else:
-                    tm = np.arccos(-L/d)
+                    tm = np.arccos(-x/d)
                     if tb > tm:
                         tm = 2*np.pi-tm  
                     summ -= aux_lambda(x, tm)
                     summ -= aux_lambda(x, tm)
                     summ += aux_lambda(x, tb)
             else:
+                summ = 0
                 if x >= -d*np.cos(tb):
+                    tm = np.arccos(-x/d)
                     summ -= aux_lambda(x, tb)
                     if tb > tm:
                         tm = 2*np.pi-tm

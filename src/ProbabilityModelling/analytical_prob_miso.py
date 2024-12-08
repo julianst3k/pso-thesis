@@ -250,7 +250,9 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            print([interv for interv in self.sol_offset_equations[triang]])
+            print(f"Average angle: {triang.avg_ang}")
+            for interv in self.sol_offset_equations[triang]:
+                print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
 
     
 if __name__ == "__main__":
