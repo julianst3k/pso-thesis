@@ -250,9 +250,10 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            print(f"Average angle: {triang.avg_ang}")
-            for interv in self.sol_offset_equations[triang]:
-                print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
+            if triang.avg_ang < 0.3 or triang.avg_ang > 6.2:
+                print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}")
+                for interv in self.sol_offset_equations[triang]:
+                    print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
 
     
 if __name__ == "__main__":
@@ -270,8 +271,10 @@ if __name__ == "__main__":
                {"thr": -0.6, "consts": {"a":-1.51, "b": 1.3}},
                {"thr": 0.6, "consts": {"a":-1, "b":np.pi/2}},
                {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
-               {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
+               {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
+    #print([triang.max_r for triang in an_prob.rect])
     an_prob.integral_debug()
+    print(f"A: {an_prob.a}, B: {an_prob.b**2}, d: {an_prob.d}, cos: {an_prob.cosfov}, sin: {an_prob.sinbeta}")
 
 

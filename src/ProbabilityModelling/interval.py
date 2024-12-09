@@ -132,4 +132,4 @@ class OffsetInterval(Interval):
     def _integrate_debug(self, triang, parameters):
         integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
         acos_integral = integrator.acos_integrator(triang)
-        print(acos_integral)
+        return acos_integral
