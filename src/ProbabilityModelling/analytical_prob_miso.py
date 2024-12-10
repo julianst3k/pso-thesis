@@ -250,10 +250,11 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            if triang.avg_ang < 0.3 or triang.avg_ang > 6.2:
+            if triang.avg_ang > 3.3 and triang.avg_ang < 3.5:
                 print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}")
                 for interv in self.sol_offset_equations[triang]:
-                    print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
+                    if interv.lb <= triang.max_r:
+                        print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
 
     
 if __name__ == "__main__":

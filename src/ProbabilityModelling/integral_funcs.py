@@ -50,10 +50,9 @@ class MISOOffsetIntegrator:
         """
         integr = 0
         if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
-            integr += lambda_over_one_wrap(xt, xb, tt, tb)
-            self.arctan_acos_integral_debug(xt, xb, tt, tb)
-            
+            integr += lambda_over_one_wrap(xt, xb, tt, tb)            
             integr += lambda_over_two_wrap(xt, xb, tt, tb)
+            self.arctan_acos_integral_debug(xt,xb,tt,tb)
         elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
             print("2")
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
@@ -70,18 +69,14 @@ class MISOOffsetIntegrator:
             integr += lambda_over_two_wrap(xt, x_d, tt, tb)
             integr += lambda_under_one_wrap(x_d, xb, tt, tb)
             integr += lambda_under_two_wrap(x_d, xb, tt, tb)
-        print(integr)
         lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
         integr *= cosfov/sinbeta
-        print(integr)
         aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
         integr += -a*(aux_integr)/(b*sinbeta)
         integr *= self.consts["a"]
-        print(a*(lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb))/(b), "Summ")
         integr += self.consts["b"]/2*(xt**2-xb**2)*(tt-tb)
-        print(integr, self.consts["b"]/2*(xt**2-xb**2)*(tt-tb), self.consts["b"])
         return integr
     def _acos_lambda_wrapper(self, N = 10):
         lambda_over_one, lambda_over_two = self.acos_lambda_over_b(N) # f(x,t), f(xt, xb, t)
@@ -228,13 +223,23 @@ class MISOOffsetIntegrator:
                 summ -= xb_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
             return summ
         def arctan_tanh_expr(xt, xb, t, d):
-            eta = (xt*xb+d**2)/(2*d*(xt+xb))
-            multiplier = d/2*(xt-xb)/(xt+xb)
-            if eta**2 > 1:
-                summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
+            eta = (xt*xb+d**2)/(d*(xt+xb))
+            multiplier = d*(xt-xb)/(xt+xb)
+            if np.abs((xt-xb)/(2*(xt+xb))*np.sin(t)/(eta+np.cos(t))) < 1:
+                multiplier = d*(xt-xb)/(xt+xb)
+                if eta**2 > 1:
+                    summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
+                else:
+                    u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
+                    tplace = 3.3531
+                    uplace = (eta-1)/np.sqrt(1-eta**2)*np.tan(tplace/2)
+                    summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if u <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
+#                    print(2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u),2*eta/np.sqrt(1-eta**2)*np.arctanh((u-uplace)/(1+u*uplace)),np.tan(t/2), eta)
+                summ += t
             else:
-                summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh((eta-1)/np.sqrt(1-eta**2)*np.tan(t/2))    
-            summ += t
+                multiplier = d
+                summ = (np.pi/2-eta/((xt-xb)/(d*(xt+xb))))*np.log(np.abs(np.sin(t)))
+                summ += eta*(t+np.cos(t)/np.sin(t))
             return summ*multiplier
         d = self.params.d
         log_int = 1/2*(arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2)))
@@ -256,17 +261,28 @@ class MISOOffsetIntegrator:
                 summ -= xb_coef**n*(-1)**(n+1)*self.f_cos(t, n)/n
             return summ
         def arctan_tanh_expr(xt, xb, t, d):
-            eta = (xt*xb+d**2)/(2*d*(xt+xb))
-            multiplier = d/2*(xt-xb)/(xt+xb)
-            if eta**2 > 1:
-                summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
+            eta = (xt*xb+d**2)/(d*(xt+xb))
+            multiplier = d*(xt-xb)/(xt+xb)
+            if np.abs((xt-xb)/(2*(xt+xb))*np.sin(t)/(eta+np.cos(t))) < 1:
+                multiplier = d*(xt-xb)/(xt+xb)
+                if eta**2 > 1:
+                    summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
+                else:
+                    u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
+                    tplace = 3.3531
+                    uplace = (eta-1)/np.sqrt(1-eta**2)*np.tan(tplace/2)
+                    summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if u <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
+                    print(2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u),2*eta/np.sqrt(1-eta**2)*np.arctanh((u-uplace)/(1+u*uplace)),np.tan(t/2), eta)
+                summ += t
             else:
-                summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh((eta-1)/np.sqrt(1-eta**2)*np.tan(t/2))    
-            summ += t
+                multiplier = d
+                summ = (np.pi/2-eta/((xt-xb)/(d*(xt+xb))))*np.log(np.abs(np.sin(t)))
+                summ += eta*(t+np.cos(t)/np.sin(t))
             return summ*multiplier
         d = self.params.d
+        d = self.params.d
         log_int = 1/2*(arctan_acos_sum(xt, xb, tt, d, N) + tt*np.log((xt**2+d**2)/(xb**2+d**2)))-1/2*(arctan_acos_sum(xt, xb, tb, d, N) + tb*np.log((xt**2+d**2)/(xb**2+d**2)))
-        print(f"Arctan: {arctan_tanh_expr(xt, xb, tt, d)-arctan_tanh_expr(xt, xb, tb, d)}, {log_int}, {np.log(xt**2+d**2)}, {xt}, {xb}")
+        print(f"Arctan: {arctan_tanh_expr(xt, xb, tt, d)-arctan_tanh_expr(xt, xb, tb, d)}, {arctan_tanh_expr(xt, xb, tt, d)}")
   
     def f_cos(self, t, order):
         """
