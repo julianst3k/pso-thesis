@@ -79,9 +79,9 @@ class MISOOffsetIntegrator:
         aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
         integr += -a*(aux_integr)/(b*sinbeta)
         integr *= self.consts["a"]
-        print(-a*(lambda_one_a_constant(xb, tt)-lambda_one_a_constant(xb,tb))/(b))
+        print(a*(lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb))/(b), "Summ")
         integr += self.consts["b"]/2*(xt**2-xb**2)*(tt-tb)
-        print(integr, self.consts["b"]/2*(xt**2-xb**2)*(tt-tb))
+        print(integr, self.consts["b"]/2*(xt**2-xb**2)*(tt-tb), self.consts["b"])
         return integr
     def _acos_lambda_wrapper(self, N = 10):
         lambda_over_one, lambda_over_two = self.acos_lambda_over_b(N) # f(x,t), f(xt, xb, t)
@@ -120,14 +120,12 @@ class MISOOffsetIntegrator:
         def sign_discerner(x,t,d,use_discerner):
             multiplier = d*np.sin(t)
             eta = 4*d*x/(x+d)**2
-            if t<np.pi or not use_discerner:
-                summ = np.log(x+d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
-                summ *= multiplier
-                summ += (x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)
-            elif t>=np.pi:
-                summ = np.log(-x-d*np.cos(t)+np.sqrt(x**2+2*d*x*np.cos(t)+d**2))-1
-                summ *= multiplier
-                summ += (x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)-(x+d)*sp.special.ellipeinc(t/2, eta)
+            base = 2*(x+d)*sp.special.ellipeinc(t/2, eta)
+            summ = np.arctanh((x+d*np.cos(t))/np.sqrt(x**2+2*d*x*np.cos(t)+d**2)) if abs(np.sin(t)) > 0.0001 else 0
+            summ *= multiplier
+            summ += (x+d)*sp.special.ellipeinc(t/2, eta)-(x**2-d**2)/(x+d)*sp.special.ellipkinc(t/2, eta)
+            summ *= -1
+            summ += base
             return summ
         b = self.params.b
         d = self.params.d
