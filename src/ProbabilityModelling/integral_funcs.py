@@ -230,10 +230,7 @@ class MISOOffsetIntegrator:
                     summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
                 else:
                     u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
-                    tplace = 3.3531
-                    uplace = (eta-1)/np.sqrt(1-eta**2)*np.tan(tplace/2)
-                    summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if u <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
-#                    print(2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u),2*eta/np.sqrt(1-eta**2)*np.arctanh((u-uplace)/(1+u*uplace)),np.tan(t/2), eta)
+                    summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if np.abs(u) <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
                 summ += t
             else:
                 multiplier = d
@@ -242,7 +239,7 @@ class MISOOffsetIntegrator:
             return summ*multiplier
         d = self.params.d
         log_int = 1/2*(arctan_acos_sum(xt, xb, t, d, N) + t*np.log((xt**2+d**2)/(xb**2+d**2)))
-        print(f"Arctan: {arctan_tanh_expr(xt, xb, t, d)}, {log_int}, {log_int - arctan_tanh_expr(xt, xb, t, d)}")
+        #print(f"Arctan: {arctan_tanh_expr(xt, xb, t, d)}, {log_int}, {log_int - arctan_tanh_expr(xt, xb, t, d)}")
         return log_int - arctan_tanh_expr(xt, xb, t, d)
     def arctan_acos_integral_debug(self, xt, xb, tt, tb, N=10):
         """
