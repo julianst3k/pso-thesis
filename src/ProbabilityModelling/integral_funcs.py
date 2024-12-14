@@ -148,7 +148,7 @@ class MISOOffsetIntegrator:
                     base = 1/3*(np.sin(t)**3*np.log(-d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
                     summ = 0
                     for n in range(1,N):
-                        summ += (x/d)**n*(-1)**n/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
+                        summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
                     return summ + base
                 else:
                     if x == 0: 
@@ -160,7 +160,7 @@ class MISOOffsetIntegrator:
                     base = np.sin(t)**3/3*np.log(x)
                     summ = 0
                     for n in range(1,N):
-                        summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                        summ += (d/x)**n*(-1)**(n-1)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
                 return summ + base
 
             aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t))
@@ -224,7 +224,6 @@ class MISOOffsetIntegrator:
                 else:
                     xm = d*(-(-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
                 summ -= lambda_low(xm, tt, tb)-lambda_up(xm, tt,tb)
-                print(lambda_up(xm, tt,tb))
         return summ
 
 
