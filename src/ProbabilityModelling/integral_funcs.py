@@ -145,7 +145,7 @@ class MISOOffsetIntegrator:
                 if x+d*np.cos(t) < 0:
                     u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                     base = 0
-                    #base = 1/3*(np.sin(t)**3*np.log(-d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
+                    base = 1/3*(np.sin(t)**3*np.log(-d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
                     summ = 0
                     for n in range(1,N):
                         summ += (x/d)**n*(-1)**n/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
