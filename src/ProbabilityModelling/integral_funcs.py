@@ -52,9 +52,11 @@ class MISOOffsetIntegrator:
         if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
             integr += lambda_over_one_wrap(xt, xb, tt, tb)            
             integr += lambda_over_two_wrap(xt, xb, tt, tb)
+            self.arctan_acos_integral_debug(xt,xb,tt,tb)
         elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
             print("2")
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
+            print(lambda_under_two_wrap(xt, xb, tt, tb))
             integr += lambda_under_two_wrap(xt, xb, tt, tb)
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
             print("3")
@@ -68,10 +70,12 @@ class MISOOffsetIntegrator:
             integr += lambda_over_two_wrap(xt, x_d, tt, tb)
             integr += lambda_under_one_wrap(x_d, xb, tt, tb)
             integr += lambda_under_two_wrap(x_d, xb, tt, tb)
+        print(integr)
         lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
         integr *= cosfov/sinbeta
+        print(integr*self.consts["a"])
         aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
         integr += -a*(aux_integr)/(b*sinbeta)
         integr *= self.consts["a"]
@@ -86,13 +90,14 @@ class MISOOffsetIntegrator:
         lambda_under_two_wrap = lambda xt, xb, tt, tb: lambda_under_two(xt, xb, tt, tb)
         return lambda_over_one_wrap, lambda_over_two_wrap, lambda_under_one_wrap, lambda_under_two_wrap
     def solve_b_u_threshold(self, avg_t, d, b):
-        a = 1
-        b = 2*d*np.cos(avg_t)
-        c = d**2-b**2
-        if b**2-4*a*c >= 0:
-            sol_one = (-b+np.sqrt(b**2-4*a*c))/(2*c)
-            sol_two = (-b-np.sqrt(b**2-4*a*c))/(2*c)
-            return sol_one, sol_two
+        ae = 1
+        be = 2*d*np.cos(avg_t)
+        ce = d**2-b**2
+        print(be**2-4*ae*ce)
+        if be**2-4*ae*ce >= 0:
+            sol_one = (-b+np.sqrt(be**2-4*ae*ce))/(2*ce)
+            sol_two = (-b-np.sqrt(be**2-4*ae*ce))/(2*ce)
+            return max(sol_one, sol_two), min(sol_two, sol_one)
         else:
             """
             Para que lo de arriba no ocurra, c > 0, lo que implica que siempre es mayor a b**2
@@ -133,13 +138,32 @@ class MISOOffsetIntegrator:
         def lambda_upper_aux(x, tt, tb, d):
             ## Tested, I think..
             def cos_expansion(x, d, t, N = 10):
-                summ = 0
-                for n in range(1,N):
-                    summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
-                return summ
+                ## Integral of d^2sin^2dcos(x)/(L+dcos(x)) // :)
+                ## 1/(L+dcos(x)) -> log|L+dcos(x)|
+                ## Si L+dcos(x) < 0 -> log(-L-dcos(x)) => No me conviene pq no puedo factorizar para afuera
+                ## Solucion: Dividir por -dcos(x) (El cual es negativo)
+                if x+d*np.cos(t) < 0:
+                    u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
+                    base = 0
+                    #base = 1/3*(np.sin(t)**3*np.log(-d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
+                    summ = 0
+                    for n in range(1,N):
+                        summ += (x/d)**n*(-1)**n/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
+                    return summ + base
+                else:
+                    if x == 0: 
+                        # En este caso, log(x) = 0, y d/x = inf,
+                        # Sin embargo, la solucion real es log(dcos(x)) => usar simplemente el caso base de arriba
+                        u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
+                        base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))+(np.log(u)-np.sin(t)-np.sin(t)**3/3)) 
+                        return base 
+                    base = np.sin(t)**3/3*np.log(x)
+                    summ = 0
+                    for n in range(1,N):
+                        summ += (d/x)**n*(-1)**n/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                return summ + base
 
-            aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(np.sin(t)**3/3*np.log(x)+
-        cos_expansion(x,d,t))
+            aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t))
             if x >= -d*np.cos(tt): # x+dcos(t) > 0
             ## This hasnt been tested but lets assume it is true cuz why not
                 summ = aux_lambda(x, tt)
@@ -149,8 +173,6 @@ class MISOOffsetIntegrator:
                     tm = np.arccos(-x/d)
                     if tb > tm:
                         tm = 2*np.pi-tm  
-                    summ -= aux_lambda(x, tm)
-                    summ -= aux_lambda(x, tm)
                     summ += aux_lambda(x, tb)
             else:
                 summ = 0
@@ -159,8 +181,6 @@ class MISOOffsetIntegrator:
                     summ -= aux_lambda(x, tb)
                     if tb > tm:
                         tm = 2*np.pi-tm
-                    summ += aux_lambda(x, tm)
-                    summ += aux_lambda(x, tm)
                     summ -= aux_lambda(x, tt)
 
                 else:
@@ -168,7 +188,7 @@ class MISOOffsetIntegrator:
             return summ
         
         lambda_upper = lambda x, tt, tb: lambda_upper_aux(x, tt, tb, d) 
-        lambda_lower_aux = lambda x, t: (-1)**(t<np.pi)*(-x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.tan(t/2))+d*x**3/3*np.log(np.sin(t))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.tan(t/2))))
+        lambda_lower_aux = lambda x, t: (-1)**(t<np.pi)*(-x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.abs(np.tan(t/2)))+d*x**3/3*np.log(np.abs(np.sin(t)))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.abs(np.tan(t/2)))))
         lambda_lower = lambda x, tt, tb: lambda_lower_aux(x,tt) - lambda_lower_aux(x,tb)
         return lambda_upper, lambda_lower
     def x_dcos_ineq_integral(self, xt, xb, tt, tb, d):
@@ -177,7 +197,7 @@ class MISOOffsetIntegrator:
         """
         lambda_up, lambda_low = self.x_dcos_ineq_integral_over_theta(d)
         ## tt, tb in [0,pi] or [pi,2pi] so...
-        avg = (xt + xb)/2
+        avg = (tt + tb)/2
         summ = 0
         sign_of_sin = np.sin(avg) < 0
         if  np.abs(xb + d*np.cos(avg)) < np.abs(d*np.sin(avg)):
@@ -196,6 +216,7 @@ class MISOOffsetIntegrator:
             if np.abs(xt + d*np.cos(avg)) > np.abs(np.sin(avg)):
                 summ += lambda_up(xt, tt, tb)-lambda_up(xb, tt, tb)
             else:
+                print("...")
                 summ += lambda_low(xt, tt, tb)-lambda_up(xb, tt,tb)
                 # [xb, xm] -> Above, [xm, xt] > Below
                 if xb+d*np.cos(avg) > 0:
@@ -203,6 +224,7 @@ class MISOOffsetIntegrator:
                 else:
                     xm = d*(-(-1)**sign_of_sin*np.sin(avg)-np.cos(avg))
                 summ -= lambda_low(xm, tt, tb)-lambda_up(xm, tt,tb)
+                print(lambda_up(xm, tt,tb))
         return summ
 
 
@@ -227,12 +249,15 @@ class MISOOffsetIntegrator:
             if np.abs((xt-xb)/(2*(xt+xb))*np.sin(t)/(eta+np.cos(t))) < 1:
                 multiplier = d*(xt-xb)/(xt+xb)
                 if eta**2 > 1:
+                    print("Entering Arctan Tan")
                     summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
                 else:
+                    print("Entering Arctan Tanh")
                     u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
                     summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if np.abs(u) <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
                 summ += t
             else:
+                print("Entering Arctan Neg")
                 multiplier = d
                 summ = (np.pi/2-eta/((xt-xb)/(d*(xt+xb))))*np.log(np.abs(np.sin(t)))
                 summ += eta*(t+np.cos(t)/np.sin(t))
@@ -266,6 +291,7 @@ class MISOOffsetIntegrator:
                 else:
                     u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
                     summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if np.abs(u) <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
+                print(eta, multiplier)
                 summ += t
             else:
                 multiplier = d
@@ -275,19 +301,22 @@ class MISOOffsetIntegrator:
         d = self.params.d
         d = self.params.d
         
-        log_int = 1/2*(arctan_acos_sum(xt, xb, tt, d, N) + tt*np.log((xt**2+d**2)/(xb**2+d**2)))-1/2*(arctan_acos_sum(xt, xb, tb, d, N) + tb*np.log((xt**2+d**2)/(xb**2+d**2)))
-        print(f"Arctan: {arctan_tanh_expr(xt, xb, tt, d)-arctan_tanh_expr(xt, xb, tb, d)}, {arctan_tanh_expr(xt, xb, tt, d)}")
+        log_int = 1/2*(arctan_acos_sum(xt, xb, tt, d, N))-1/2*(arctan_acos_sum(xt, xb, tb, d, N))
+        print(f"Arctan: {arctan_tanh_expr(xt, xb, tt, d)-arctan_tanh_expr(xt, xb, tb, d)}, {log_int}")
   
     def f_cos(self, t, order):
         """
             Tested: Yes
             Integral of cos^(order)(x)
         """
+
         sum_base = np.sin(t)*np.cos(t)**(order-1)
         summation = 0
         multiplier = 1
         if order == 0:
             return t
+        elif order < 0:
+            return self.f_sec(t, order)
         for i in range(order//2 if order % 2 == 0 else order//2+1):
             if i==0:
                 multiplier *= 1/(order)
@@ -298,6 +327,27 @@ class MISOOffsetIntegrator:
         if order % 2 == 0:
             summation += multiplier*t
         return summation    
+
+    def f_sec(self, t, order):
+        sum_base = np.tan(t)
+        order = -order
+        if order > 1:
+            sum_base *= 1/np.cos(t)**(order-2)
+        else:
+            return np.log(np.abs((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))))
+        summation = 0
+        multiplier = 1
+        for i in range((order)//2 if order % 2 == 0 else (order-1)//2):
+            if i==0:
+                multiplier *= 1/(order-1)
+            else:
+                multiplier *= (order-2*i)/(order-2*i-1)
+            summation += multiplier*np.cos(t)**(2*i)
+        pre_sum = summation
+        summation *= sum_base
+        if order % 2 == 1:
+            summation += multiplier*np.log(np.abs((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))))
+        return summation
     def atan_integral(self, triang):
         """
         Tested = Necesito mas ejemplos pero por ahora esta bien

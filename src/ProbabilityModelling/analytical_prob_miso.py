@@ -88,7 +88,6 @@ class AnalyticalMISO(AnalyticalProbability):
         epsilon = 0.001 # Relevant to avoid floating problems
         acos_arg = (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)
         if acos_arg > 1+epsilon:
-            print(acos_arg, L)
             raise OutOfUnitaryBound
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
         acos_arg = max(min(1, acos_arg),-1)
@@ -120,6 +119,8 @@ class AnalyticalMISO(AnalyticalProbability):
         current_interval = 0
         return_interval = []
         for i, lim in enumerate(list_of_thresholds):
+            if lim.high == lim.low:
+                continue
             while current_interval < len(list_of_intervals):
                 curr = list_of_intervals[current_interval]
                 if curr.lb < lim.low:
@@ -250,8 +251,8 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            if triang.avg_ang > 3.3 and triang.avg_ang < 3.5:
-                print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}")
+            if triang.avg_ang > 3.39 and triang.avg_ang < 3.41:
+                print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}, Max_r: {triang.max_r}")
                 for interv in self.sol_offset_equations[triang]:
                     if interv.lb <= triang.max_r:
                         print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
