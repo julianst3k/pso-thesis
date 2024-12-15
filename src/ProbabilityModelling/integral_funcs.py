@@ -52,12 +52,11 @@ class MISOOffsetIntegrator:
         if x_u is None or xb >= x_u or xt <= x_d: # No hay interseccion, como es creciente entonces estamos por sobre b
             integr += lambda_over_one_wrap(xt, xb, tt, tb)            
             integr += lambda_over_two_wrap(xt, xb, tt, tb)
-            self.arctan_acos_integral_debug(xt,xb,tt,tb)
         elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
             print("2")
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
-            print(lambda_under_two_wrap(xt, xb, tt, tb))
             integr += lambda_under_two_wrap(xt, xb, tt, tb)
+            print(integr, lambda_under_one_wrap(xt, xb, tt, tb), lambda_under_two_wrap(xt, xb, tt, tb))
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
             print("3")
             integr += lambda_under_one_wrap(x_u, xb, tt, tb)
@@ -70,12 +69,12 @@ class MISOOffsetIntegrator:
             integr += lambda_over_two_wrap(xt, x_d, tt, tb)
             integr += lambda_under_one_wrap(x_d, xb, tt, tb)
             integr += lambda_under_two_wrap(x_d, xb, tt, tb)
-        print(integr)
+        #print(integr)
         lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
         integr *= cosfov/sinbeta
-        print(integr*self.consts["a"])
+        pre_a = integr*self.consts["a"]
         aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
         integr += -a*(aux_integr)/(b*sinbeta)
         integr *= self.consts["a"]
@@ -93,7 +92,6 @@ class MISOOffsetIntegrator:
         ae = 1
         be = 2*d*np.cos(avg_t)
         ce = d**2-b**2
-        print(be**2-4*ae*ce)
         if be**2-4*ae*ce >= 0:
             sol_one = (-b+np.sqrt(be**2-4*ae*ce))/(2*ce)
             sol_two = (-b-np.sqrt(be**2-4*ae*ce))/(2*ce)
@@ -157,10 +155,18 @@ class MISOOffsetIntegrator:
                         u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                         base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))+(np.log(u)-np.sin(t)-np.sin(t)**3/3)) 
                         return base 
-                    base = np.sin(t)**3/3*np.log(x)
-                    summ = 0
-                    for n in range(1,N):
-                        summ += (d/x)**n*(-1)**(n-1)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                    if x > d*np.cos(t):
+                        base = np.sin(t)**3/3*np.log(x)
+                        summ = 0
+                        for n in range(1,N):
+                            summ += (d/x)**n*(-1)**(n-1)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                    else:
+                        u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
+                        base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
+                        summ = 0
+                        for n in range(1,N):
+                            summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
+
                 return summ + base
 
             aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t))
@@ -216,7 +222,6 @@ class MISOOffsetIntegrator:
             if np.abs(xt + d*np.cos(avg)) > np.abs(np.sin(avg)):
                 summ += lambda_up(xt, tt, tb)-lambda_up(xb, tt, tb)
             else:
-                print("...")
                 summ += lambda_low(xt, tt, tb)-lambda_up(xb, tt,tb)
                 # [xb, xm] -> Above, [xm, xt] > Below
                 if xb+d*np.cos(avg) > 0:
@@ -248,15 +253,12 @@ class MISOOffsetIntegrator:
             if np.abs((xt-xb)/(2*(xt+xb))*np.sin(t)/(eta+np.cos(t))) < 1:
                 multiplier = d*(xt-xb)/(xt+xb)
                 if eta**2 > 1:
-                    print("Entering Arctan Tan")
                     summ = -2*eta/np.sqrt(eta**2-1)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
                 else:
-                    print("Entering Arctan Tanh")
                     u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
                     summ = 2*eta/np.sqrt(1-eta**2)*np.arctanh(u) if np.abs(u) <= 1 else 2*eta/np.sqrt(1-eta**2)*np.arctanh(1/u) 
                 summ += t
             else:
-                print("Entering Arctan Neg")
                 multiplier = d
                 summ = (np.pi/2-eta/((xt-xb)/(d*(xt+xb))))*np.log(np.abs(np.sin(t)))
                 summ += eta*(t+np.cos(t)/np.sin(t))
@@ -369,6 +371,7 @@ class MISOOffsetIntegrator:
                 subsum[2] += lamb(xt, tt)-lamb(xt,tb) if np.abs(xt-d) >= 0.1 else 0
             else:
                 summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
+
                 if i < 2:
                     subsum[0] += lamb(xt, tt)-lamb(xt,tb)
                     
@@ -388,14 +391,21 @@ class MISOOffsetIntegrator:
         def approx_der(x, d, tb):
             approx_der = 1/(x**2+2*d*x*np.cos(tb)+d**2)*(x*d*np.cos(tb)+d**2)
             return approx_der
+        def fourth_lambda(x, d, t):
+            "int d^2sin(x)cos(x)log(x^2+d^2+2dxcos(x)) dt"
+            multiplier = d**2
+            log_x_d = -np.log((x**2+d**2))*np.cos(2*t)/2
+            expansion = sum([((2*x*d)/(x**2+d**2))**n*(-1)**(n)*np.cos(t)**(n+2)/(n*(n+2)) for n in range(1,15)])
+            print("Expansion + log", expansion+log_x_d, x, t)
+            return expansion+log_x_d
+
         d = self.params.d
         avg = triang.avg_ang
         lambda_list = []
         lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+(x**2/2)*approx_der(x,d,avg)*(t**2/2-avg*t))
         lambda_list.append(lambda x, t: -(d**2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
         lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
-        lambda_list.append(lambda x, t: -1/4*d**2*(np.cos(2*t)/2*np.log(x**2+d**2+2*d*x*np.cos(t))-d*x*(x**4+d**4)/(4*d**3*x**3)*np.log(x**2+d**2+2*d*x*np.cos(t))))
-        lambda_list.append(lambda x, t: 1/4*d**3*x*(-np.cos(2*t)/(4*d*x)+np.cos(t)*(x**2+d**2)/(2*d**2*x**2)))
+        lambda_list.append(lambda x, t: -fourth_lambda(x, d, t))
         return lambda_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):

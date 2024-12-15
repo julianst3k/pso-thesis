@@ -251,11 +251,10 @@ class AnalyticalMISO(AnalyticalProbability):
     def integral_debug(self):
         self._interval_divide()
         for triang in self.rect:
-            if triang.avg_ang > 3.39 and triang.avg_ang < 3.41:
-                print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}, Max_r: {triang.max_r}")
-                for interv in self.sol_offset_equations[triang]:
-                    if interv.lb <= triang.max_r:
-                        print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
+            print(f"Average angle: {triang.avg_ang}, Top Angle: {triang.ang_high}, Low Angle: {triang.ang_low}, Max_r: {triang.max_r}")
+            for interv in self.sol_offset_equations[triang]:
+                if interv.lb <= triang.max_r:
+                    print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
 
     
 if __name__ == "__main__":
@@ -269,10 +268,10 @@ if __name__ == "__main__":
     Y = 3
     d = 1
     threshs = [{"thr": -1, "consts": 1},
-               {"thr": -0.9, "consts": {"a":-3.2, "b": -0.2}},
+               {"thr": -0.85, "consts": {"a":-3.2, "b": -0.2}},
                {"thr": -0.6, "consts": {"a":-1.51, "b": 1.3}},
                {"thr": 0.6, "consts": {"a":-1, "b":np.pi/2}},
-               {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
+               {"thr": 0.85, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
