@@ -387,23 +387,24 @@ class MISOOffsetIntegrator:
         """
         def approx_val(x, d, tb):
             approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
+            print(approx_val, tb)
             return approx_val
         def approx_der(x, d, tb):
             approx_der = 1/(x**2+2*d*x*np.cos(tb)+d**2)*(x*d*np.cos(tb)+d**2)
             return approx_der
         def fourth_lambda(x, d, t):
             "int d^2sin(x)cos(x)log(x^2+d^2+2dxcos(x)) dt"
-            multiplier = d**2
-            log_x_d = -np.log((x**2+d**2))*np.cos(2*t)/2
-            expansion = sum([((2*x*d)/(x**2+d**2))**n*(-1)**(n)*np.cos(t)**(n+2)/(n*(n+2)) for n in range(1,15)])
-            print("Expansion + log", expansion+log_x_d, x, t)
-            return expansion+log_x_d
+            multiplier = d**2/2
+            log_x_d = 0
+            log_x_d = -(np.log((x**2+d**2))-1+np.log(2))*np.cos(2*t)/4
+            expansion = -sum([((2*x*d)/(x**2+d**2))**n*(-1)**(n-1)*np.cos(t)**(n+2)/(n*(n+2)) for n in range(1,15)])
+            return (log_x_d+expansion)*multiplier
 
         d = self.params.d
         avg = triang.avg_ang
         lambda_list = []
         lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+(x**2/2)*approx_der(x,d,avg)*(t**2/2-avg*t))
-        lambda_list.append(lambda x, t: -(d**2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
+        lambda_list.append(lambda x, t: -(d**2/2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
         lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
         lambda_list.append(lambda x, t: -fourth_lambda(x, d, t))
         return lambda_list
