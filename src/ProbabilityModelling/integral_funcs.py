@@ -159,7 +159,7 @@ class MISOOffsetIntegrator:
                         base = np.sin(t)**3/3*np.log(x)
                         summ = 0
                         for n in range(1,N):
-                            summ += (d/x)**n*(-1)**(n-1)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                            summ += (d/x)**n*(-1)**(n)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
                     else:
                         u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                         base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
@@ -379,7 +379,7 @@ class MISOOffsetIntegrator:
                     subsum[1] += lamb(xt, tt)-lamb(xt,tb)
                 else:
                     subsum[2] += lamb(xt, tt)-lamb(xt,tb)
-        return summ, subsum
+        return summ
     def atan_lambdas(self, triang):
         """
         Done!
@@ -445,15 +445,15 @@ class NonOriginIntegrator:
     def integral_even(self, Dn, theta_bot, theta_top, theta_crt, n):
         max_Dn = Dn/np.cos(theta_top)
         if self.ub > max_Dn:
-            return 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_top, n), theta_top
+            return 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_top, n)*1/np.pi, theta_top
         elif self.ub < Dn:
-            return 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_top, n), None
+            return 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi, None
         else:
             theta_mid = np.arccos(Dn/self.ub)
             if theta_mid < theta_top:
                 theta_mid = theta_top
-            cosine_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_mid, n)
-            linear_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_mid, theta_top, n)
+            cosine_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_cosine(Dn, theta_bot, theta_mid, n)*1/np.pi
+            linear_int = 1/(Dn**2*np.tan(theta_cr))*self.integral_linear(Dn, theta_mid, theta_top, n)*1/np.pi
             return cosine_int+linear_int, theta_mid
     def integral_odd(self, Dn, theta_bot, theta_top, theta_crt, n):
         max_Dn = Dn/np.sin(theta_bot)
@@ -777,14 +777,19 @@ class TriangleIntegrator:
             
     def wrapper_integrator(self, list_of_lims, parameters):
         X, Y = self.rect.X, self.rect.Y
-        area = X*Y
+        area = 0
         tot_int = 0
         for triang, lims in list_of_lims:
             for lim in lims:
                 interv_bot, interv_top = lim
-                integral = interv_top.integrate_ub(triang, parameters) - interv_bot.integrate_lb(triang, parameters)
+                integral = interv_top.integrate_ub(triang, parameters)/(2*pi) - interv_bot.integrate_lb(triang, parameters)/(2*pi)
                 tot_int += integral * triang.get_area()
-        return tot_int
+            area += triang.get_area()
+        return tot_int/area
+    def __call__(self, list_of_lims, parameters):
+        return self.wrapper_integrator(list_of_lims, parameters)
+    
+
 
         
             

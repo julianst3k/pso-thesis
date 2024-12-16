@@ -1,5 +1,6 @@
 from aux import cotan, UniformRectangle, EightRectangle, ProbabilityCalculator, IntegrationLimit, Orientation
 from interval import Interval, Bound, OffsetInterval, OutOfUnitaryBound
+from integral_funcs import TriangleIntegrator
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
@@ -184,15 +185,12 @@ class AnalyticalMISO(AnalyticalProbability):
         for interval_pair in interval_pairs:
             print(interval_pair[0], interval_pair[1])
         for interval_pair in interval_pairs:
-
             base_pair = interval_pair[0]
             offset_pair = interval_pair[1]
             solver = eq.PairGenerator(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
             solutions = solver.solve()
-            for inter in solutions:
-                print("Lower", inter[0])
-                print("Upper", inter[1])
             output.extend(solutions)
+        return output 
     def arg_acos(self, u):
         return (self.cosfov*np.sqrt(u**2+self.b**2)-self.a)/(u*self.sinbeta)
 
@@ -245,6 +243,16 @@ class AnalyticalMISO(AnalyticalProbability):
             return -base_derivative+offset_derivative_arccos+offset_derivative_tan
         else:
             return base_derivative-offset_derivative_arccos+offset_derivative_tan
+
+    def integrate(self):
+        self._interval_fit()
+        integrator = TriangleIntegrator(self.rect)
+        integral = 0
+        for triangle in self.rect:
+            pairs = self._interval_solver(self.base_offset_pairs[triangle], triangle.avg_ang)
+            integral += integrator(pairs, self)
+        return integral
+
 
 
 

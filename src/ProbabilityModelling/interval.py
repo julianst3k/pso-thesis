@@ -116,9 +116,7 @@ class OffsetInterval(Interval):
         return self._integrate(triang, parameters, offset_lb, False, True)
     def integrate_ub(self, triang, parameters):
         return self._integrate(triang, parameters, offset_ub, over_pi, False)
-    def _integrate(self, triang, parameters, is_lb):
-        offset = self.is_offset
-        over_pi = self.ub_over_pi 
+    def _integrate(self, triang, parameters, offset, over_pi, is_lb):
         integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
         acos_integral = integrator.acos_integrator(triang)
         atan_integral = integrator.atan_integrator(triang)
@@ -131,5 +129,5 @@ class OffsetInterval(Interval):
         return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
     def _integrate_debug(self, triang, parameters):
         integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
-        acos_integral = integrator.atan_integral(triang)
+        acos_integral = integrator.acos_integrator(triang)
         return acos_integral
