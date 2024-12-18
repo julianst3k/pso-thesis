@@ -26,50 +26,25 @@ class AnalyticalProbability(ProbabilityCalculator):
     
     def calculate_probability(self):
         integrator = RectangleIntegrator(self.rect)
+        summ = 0
         for lim in self.lims:
-            if lim["type"] != 1:
-                integrator.non_origin_integrator(lim.low, lim.high, lim.const, self)
+            if lim.const != 1:
+                summ += integrator.non_origin_integrator(lim.low, lim.high, lim.const, self)
             else:
-                integrator.origin_integrator(lim.high)
+                summ += integrator.origin_integrator(lim.high)
+        return summ
             
-        
-    def calculate_probability_unitary(self, L_max):
-        tot_sum = 0
-        triangles = self.rect.triangles
-        for triangle in triangles:
-            Dn = triangle.get_Dn()
-            area = triangle.get_area()
-            if triangle.orientation == Orientation.HORIZONTAL:
-                if L_max < Dn:
-                    tot_sum += area*(triangle.ang_crt-triangle.ang_low)*L_max**2/(Dn**2*np.tan(triangle.ang_crt))
-                else:
-                    new_low = np.arccos(Dn/L_max)
-                    if new_low > triangle.ang_crt:
-                        triangle.change_ang(triangle.ang_crt)
-                        new_low = triangle.ang_crt
-                    tot_sum += area*(np.tan(new_low)/np.tan(triangle.ang_crt)+
-                        (triangle.ang_crt-new_low)*(L_max**2/(Dn**2*np.tan(triangle.ang_crt))))
-            else:
-                if L_max < Dn:
-                    tot_sum += area*(triangle.ang_high-triangle.ang_crt)*L_max**2/(Dn**2*cotan(triangle.ang_crt))
-                else:
-                    new_high = np.arcsin(Dn/L_max)
-                    if new_high < triangle.ang_crt:
-                        triangle.change_ang(triangle.ang_crt)
-                        new_high = triangle.ang_crt
-                    tot_sum += area*(cotan(new_high)/cotan(triangle.ang_crt)+
-                        (new_high-triangle.ang_crt)*(L_max**2/(Dn**2*cotan(triangle.ang_crt))))
-        return tot_sum
 
 if __name__ == "__main__":
-    beta = np.pi/180*55
-    fov = np.pi/180*45
+    beta = np.pi/180*45
+    fov = np.pi/180*30
     r = 0.05
     h = 1.2
     x_c = 1
     y_c = 1
     X = 5
     Y = 3
+    d = 1
     threshs = [{"thr": -1, "consts": 1},
                {"thr": -0.9, "consts": {"a":-3.2, "b": -0.2}},
                {"thr": -0.6, "consts": {"a":-1.51, "b": 1.3}},
@@ -77,4 +52,4 @@ if __name__ == "__main__":
                {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
     an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov, beta, h, r, threshs)
-    an_prob.print_lims()
+    print(an_prob.calculate_probability())
