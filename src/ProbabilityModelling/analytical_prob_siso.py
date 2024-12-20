@@ -50,6 +50,6 @@ if __name__ == "__main__":
                {"thr": -0.6, "consts": {"a":-1.51, "b": 1.3}},
                {"thr": 0.6, "consts": {"a":-1, "b":np.pi/2}},
                {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
-               {"thr": 1, "consts": {"a":-3.2, "b": -3.3}}]
+               {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov, beta, h, r, threshs)
     print(an_prob.calculate_probability())
