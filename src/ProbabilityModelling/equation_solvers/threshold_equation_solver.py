@@ -11,18 +11,19 @@ class ThresholdSolver:
             parameters.from_one = True
             self.threshs = self.threshs[::-1]
             parameters.threshs = self.threshs
+        print(parameters.from_one)
         filled = False
         for thresh in self.threshs:
             u = thresh["thr"]
             a = parameters.cosfov**2-u**2*parameters.sinbeta**2
-            if a == 0:
+            if np.abs(a) < 1e-8:
                 L1 = (parameters.cosfov**2*parameters.b**2 - parameters.a**2)/(2*u*parameters.sinbeta)
                 L2 = None
             else:
                 b = -2*u*parameters.sinbeta*parameters.a
                 c = parameters.cosfov**2*parameters.b**2 - parameters.a**2
                 L1, L2 = self._solve_quadratic(a,b,c,u,parameters)
-            if L1 != None:
+            if L1 != None and L1 >= 0:
                 if parameters.from_one:
                     lims.append(IntegrationLimit(L1, None, thresh["consts"]))
                     xL1 = L1
@@ -36,6 +37,7 @@ class ThresholdSolver:
             if L1 == None and not filled and not parameters.from_one:
                 lims.append(IntegrationLimit(None, np.sqrt(parameters.X**2+parameters.Y**2), thresh["consts"]))
                 filled = True
+            print(lims[-1], L1, L2)
         lims.sort(key= lambda x: x.sort_radius())
 
 
@@ -99,7 +101,7 @@ class ThresholdSolver:
         for i, thresh in enumerate(self.threshs):
             u = thresh["thr"]
             a = parameters.cosfov**2-u**2*parameters.sinbeta**2
-            if a == 0:
+            if np.abs(a) < 1e-8:
                 L1 = (parameters.cosfov**2*parameters.b**2 - parameters.a**2)/(2*u*parameters.sinbeta)
                 L2 = None
             else:

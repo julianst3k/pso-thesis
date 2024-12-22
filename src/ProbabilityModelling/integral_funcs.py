@@ -445,30 +445,42 @@ class NonOriginIntegrator:
     def integral_even(self, Dn, theta_bot, theta_top, theta_crt, n):
         max_Dn = Dn/np.cos(theta_top)
         if self.ub > max_Dn:
-            return 1/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n)*1/np.pi, theta_top
+            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n)*1/np.pi
+            print(f"The cosine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_cosine(Dn, theta_bot, theta_top, n)*2/(Dn**2*np.tan(theta_crt))*1/np.pi}", Dn**2*np.tan(theta_crt))
+            return integral, theta_top
         elif self.ub < Dn:
-            return 1/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi, None
+            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi
+            print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_linear(Dn, theta_bot, theta_top, n)}")
+            return integral, None
         else:
             theta_mid = np.arccos(Dn/self.ub)
             if theta_mid < theta_top:
                 theta_mid = theta_top
-            cosine_int = 1/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n)*1/np.pi
-            linear_int = 1/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n)*1/np.pi
+            cosine_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n)*1/np.pi
+            linear_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n)*1/np.pi
+            print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_mid},{theta_top}] amounts to {self.integral_linear(Dn, theta_mid, theta_top, n)}")
+            print(f"The cosine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_mid}] amounts to {self.integral_cosine(Dn, theta_bot, theta_mid, n)}")
             return cosine_int+linear_int, theta_mid
     def integral_odd(self, Dn, theta_bot, theta_top, theta_crt, n):
         max_Dn = Dn/np.sin(theta_bot)
         if self.ub > max_Dn:
-            return 1/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n)*1/np.pi, theta_bot
+            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n)*1/np.pi
+            print(f"The sine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_sine(Dn, theta_bot, theta_top, n)*2/(Dn**2*cotan(theta_crt))*1/np.pi}", Dn**2*cotan(theta_crt))
+            return integral, theta_bot
         elif self.ub < Dn:
-            return 1/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi, None
+            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi
+            print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_linear(Dn, theta_bot, theta_top, n)}")
+            return integral, None
         else:
             theta_mid = np.arcsin(Dn/self.ub)
             if theta_mid > theta_top:
                 theta_mid = theta_top
             
-            sine_int = 1/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n)*1/np.pi
-            linear_int = 1/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n)*1/np.pi
-            #print("Mid", theta_bot, theta_top, theta_mid, sine_int, linear_int, self.ub, self.lb)
+            sine_int = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n)*1/np.pi
+            linear_int = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n)*1/np.pi
+            print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_mid}] amounts to {self.integral_linear(Dn, theta_bot, theta_mid, n)}")
+            print(f"The sine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_mid},{theta_top}] amounts to {self.integral_sine(Dn, theta_mid, theta_top, n)}")
+
             return sine_int+linear_int, theta_mid
 
     def integral_cosine(self, Dn, theta_bot, theta_top, n):
@@ -782,10 +794,12 @@ class RectangleIntegrator:
                 if crt is not None:
                     tri.change_ang(crt)
                 print(int_sum, tri.ang_crt, i)
+            if len(args) > 2:
+                print(f"The [{args[0]},{args[1]}] total is {int_sum}")
             return int_sum
         return _integrator_wrapper   
     @_integrate
-    def unitary_integrator(self, L1):
+    def origin_integrator(self, L1):
         integrator = OriginIntegrator(L1)
         return integrator
     @_integrate

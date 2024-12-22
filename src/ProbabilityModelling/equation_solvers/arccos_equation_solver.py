@@ -37,6 +37,7 @@ class ArccosEquationSolver:
         interval_solver = IntervalOffsetSolver()
         output = []
         costh = np.cos(theta)
+        print(costh)
         b = 2*parameters.sinbeta*costh*parameters.a
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
@@ -100,6 +101,7 @@ class ArccosEquationSolver:
             L1 = -a/b
             L2 = None
         sols = [L1, L2]
+        print(sols)
         i = 0
         while i < 2:
             if sols[i] is not None and (np.abs(parameters.arg_acos(sols[i]+0.001)) >= 1 or np.abs(parameters.arg_acos(sols[i]-0.001)) >= 1):   
@@ -112,6 +114,7 @@ class ArccosEquationSolver:
             else:
                 i += 1
         L1, L2 = sols[0], sols[1]
+        print(L1, L2)
         if L1 is None or L1 < 0:
             ub = parameters.eq_base(lmin, theta)
             lb = parameters.eq_base(lmin, theta,neg=-1)

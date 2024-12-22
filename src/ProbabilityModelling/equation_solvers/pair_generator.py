@@ -2,6 +2,8 @@ from aux import NewtonRaphson
 from interval import Interval, OffsetInterval
 import numpy as np
 
+
+
 class PairGenerator:
     def __init__(self, theta, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
         self.llow = max(interval.lb, offset.lb)
@@ -13,6 +15,104 @@ class PairGenerator:
         self.pair_tree = PairTreeGenerator(self, interval, offset)
     def solve(self):
         return self.pair_tree._build_solution_root()
+
+class SIMOPairGenerator:
+    """
+    El PG no es lo suficiente general para el caso SIMO (LO hice pensando para el MISO), por lo que tendria que
+    escribirlo nuevamente, so prefiero escribir una extension
+    """
+    def __init__(self, alpha, base: Interval, rotated: Interval, parameters):
+        self.llow = max(interval.lb, rotated.lb)
+        self.lhigh = min(interval.ub, rotated.ub)
+        self.alpha = alpha
+        self.rotated = rotated
+        self.base = base
+        self.parameters = parameters
+    def solve(self):
+        if rotated.offset_lb:
+            self._solve(reverse=True) # Lower
+            self._solve() # Higher
+        else:
+            self._solve()
+    def _solve(self, reverse = False):
+        parameters = self.parameters
+        upper_angle = self.alpha if not reverse else 0
+        lower_angle = self.alpha if reverse else 0
+        coth = np.cos(self.alpha/2)
+        b = -2*parameters.sinbeta*costh*parameters.a
+        a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
+        c = parameters.b**2*parameters.cosfov**2-parameters.a**2
+        sol1, sol2 = self._solve_quadratic_base(a,b,c,self.alpha,parameters, self.llow)
+        tol = 1e-4
+        if sol2 is not None:
+            try:
+                lower = parameters.eq_base(sol2, lower_angle, -1)
+                upper = parameters.eq_base(sol2, upper_angle, 1)
+                if np.abs(base_val-simo_val) < tol:
+                    # Aceptar solucion, corta arriba o abajo?
+                    try:
+                        lower = parameters.eq_base(sol2+0.001, lower_angle, -1)
+                        upper = parameters.eq_base(sol2+0.001, upper_angle, 1)
+                        if lower < upper:
+                            # Cortar la parte de abajo
+                        else:
+                            # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
+                    except OutOfUnitaryBound:
+                        # sol2+0.01 fuera de la solucion, hay que ver si hay que cortar abajo
+                        lower = parameters.eq_base(sol2-0.001, lower_angle, -1)
+                        upper = parameters.eq_base(sol2-0.001, upper_angle, 1)
+                        if lower > upper:
+                            # Cortamos abajo
+            except OutOfUnitaryBound:
+                pass
+            
+        if sol1 is not None:
+            try:
+                lower = parameters.eq_base(sol1, lower_angle, -1)
+                upper = parameters.eq_base(sol1, upper_angle, 1)
+                if np.abs(base_val-simo_val) < tol:
+                    # Aceptar solucion, corta arriba o abajo?
+                    try:
+                        lower = parameters.eq_base(sol1+0.001, lower_angle, -1)
+                        upper = parameters.eq_base(sol1+0.001, upper_angle, 1)
+                        if lower < upper:
+                            # Cortar la parte de abajo
+                        else:
+                            # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
+                    except OutOfUnitaryBound:
+                        # sol2+0.01 fuera de la solucion, hay que ver si hay que cortar abajo
+                        lower = parameters.eq_base(sol1-0.001, lower_angle, -1)
+                        upper = parameters.eq_base(sol1-0.001, upper_angle, 1)
+                        if lower > upper:
+                            # Cortamos abajo
+            except OutOfUnitaryBound:
+                pass
+def _solve_quadratic_base(self, a, b, c, theta, parameters, lmin):
+        """
+        Quick analysis
+        if a > 0 => L1 > L2
+        
+        """
+        epsilon = 0.001
+
+        if b**2-4*a*c < 0:
+            return None, None
+                
+            
+        sqrt = np.sqrt(b**2-4*a*c)
+        if a>0:
+            L1 = (-b+sqrt)/(2*a)
+            L2 = (-b-sqrt)/(2*a)
+        
+        elif a<0:
+            L2 = (-b+sqrt)/(2*a)
+            L1 = (-b-sqrt)/(2*a)
+        
+        else:
+            L1 = -a/b
+            L2 = None
+        return L1, L2
+
 class PairWrapper:
     def __init__(self, interval, offset):
         self.interval = interval
@@ -25,6 +125,9 @@ class PairWrapper:
         if index == 0:
             return self.interval
         return self.offset
+
+
+
 
 class PairTreeGenerator:
     def __init__(self, pair_generator, interval, offset):
