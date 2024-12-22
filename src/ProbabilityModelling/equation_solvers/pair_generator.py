@@ -38,12 +38,16 @@ class SIMOPairGenerator:
         parameters = self.parameters
         upper_angle = self.alpha if not reverse else 0
         lower_angle = self.alpha if reverse else 0
+        low_int = self.base if not reverse else self.rotated
+        high_int = self.base if rotated else self.rotated
         coth = np.cos(self.alpha/2)
         b = -2*parameters.sinbeta*costh*parameters.a
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
         sol1, sol2 = self._solve_quadratic_base(a,b,c,self.alpha,parameters, self.llow)
         tol = 1e-4
+        low_ph = None
+        up_ph = None
         if sol2 is not None:
             try:
                 lower = parameters.eq_base(sol2, lower_angle, -1)
@@ -54,15 +58,19 @@ class SIMOPairGenerator:
                         lower = parameters.eq_base(sol2+0.001, lower_angle, -1)
                         upper = parameters.eq_base(sol2+0.001, upper_angle, 1)
                         if lower < upper:
-                            # Cortar la parte de abajo
+                            low_int.inverse_divide_interval(sol2)
+                            high_int.inverse_divide_interval(sol2)
                         else:
                             # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
+                            low_ph = low_int.divide_interval(sol1)
+                            up_ph = upper.divide_interval(sol1)                            
                     except OutOfUnitaryBound:
                         # sol2+0.01 fuera de la solucion, hay que ver si hay que cortar abajo
                         lower = parameters.eq_base(sol2-0.001, lower_angle, -1)
                         upper = parameters.eq_base(sol2-0.001, upper_angle, 1)
                         if lower > upper:
-                            # Cortamos abajo
+                            low_int.inverse_divide_interval(sol1)
+                            high_int.inverse_divide_interval(sol1)
             except OutOfUnitaryBound:
                 pass
             
@@ -77,16 +85,28 @@ class SIMOPairGenerator:
                         upper = parameters.eq_base(sol1+0.001, upper_angle, 1)
                         if lower < upper:
                             # Cortar la parte de abajo
+                            if up_ph is not None:
+                                up_ph.inverse_divide_interval(sol1)
+                                low_ph.inverse_divide_interval(sol1)
+                            else:
+                                low_int.inverse_divide_interval(sol1)
+                                high_int.inverse_divide_interval(sol1)
                         else:
-                            # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
+                            low_int.divide_interval(sol1)
+                            high_int.divide_interval(sol1)                            
                     except OutOfUnitaryBound:
                         # sol2+0.01 fuera de la solucion, hay que ver si hay que cortar abajo
                         lower = parameters.eq_base(sol1-0.001, lower_angle, -1)
                         upper = parameters.eq_base(sol1-0.001, upper_angle, 1)
                         if lower > upper:
-                            # Cortamos abajo
+                            low_int.inverse_divide_interval(sol1)
+                            high_int.inverse_divide_interval(sol1)
             except OutOfUnitaryBound:
                 pass
+        if up_ph is None:
+            return None
+        else:
+            return [low_ph,up_ph]
 def _solve_quadratic_base(self, a, b, c, theta, parameters, lmin):
         """
         Quick analysis
