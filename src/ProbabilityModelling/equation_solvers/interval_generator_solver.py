@@ -41,14 +41,14 @@ class IntervalOffsetSolver:
                             interv = [Interval(True, False, 0, L2.sol), Interval(True, True, L2.sol, maxr)]
 
                         else:
-                            interv = [Interval(False, False, 0, L2.sol), Interval(True, False, L2.sol, maxr)]
+                            interv = [Interval(True, False, 0, L2.sol), Interval(False, False, L2.sol, maxr)]
                 else:
                     if (L1.ub or L1.lb):
                         if L1.ub:
                             interv = [Interval(True, False, 0, L1.sol), Interval(True, True, L1.sol, maxr)]
 
                         else:
-                            interv = [Interval(False, False, 0, L1.sol), Interval(True, False, L1.sol, maxr)]
+                            interv = [Interval(True, False, 0, L1.sol), Interval(False, False, L1.sol, maxr)]
 
                     else:
                         bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)

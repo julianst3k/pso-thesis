@@ -10,6 +10,7 @@ class AnalyticalSIMO(AnalyticalProbability):
         super().__init__(X, Y, x_center, y_center, fov, beta, h, r, threshs)
         self.alpha = alpha
         self.solve_thresholds()
+        self._solve_offset()
     def _solve_offset(self):
         base_solver = eq.ArccosEquationSolver(self.threshs)
         self.simo_intervals = base_solver.solve_base_equations(self, self.alpha, 0)
@@ -18,7 +19,19 @@ class AnalyticalSIMO(AnalyticalProbability):
         self.sol_base_equations = self.divide_by_lims([base_interval], self.lims)
         self.sol_simo_equations = self.divide_by_lims(self.simo_intervals, self.lims)
         self.base_simo_pairs = self.interval_pairing(self.sol_base_equations, self.sol_simo_equations)
+        self.base_simo_pairs = [[pair[0], pair[1]] for pair in self.base_simo_pairs if np.abs(pair[0].lb-pair[0].ub)>1e-4]
         
+        for pair in self.base_simo_pairs:
+            base, rotated = pair[0], pair[1]
+            pair_generator = eq.SIMOPairGenerator(self.alpha, base, rotated, self)
+            extra_pair_generated = pair_generator.solve()
+            if extra_pair_generated is not None:
+                self.base_simo_pairs.append(extra_pair_generated)
+        self.base_simo_pairs.sort(key =  lambda x: x[0].lb)
+        for pair in self.base_simo_pairs:
+            print(pair[0])
+            print(pair[1]) 
+    
 if __name__ == "__main__":
     beta = np.pi/180*45
     fov = np.pi/180*45
@@ -38,4 +51,4 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalSIMO(X, Y, x_c, y_c, fov, beta, h, r, threshs, alpha)
     #print([triang.max_r for triang in an_prob.rect])
-    an_prob.solve_offset()
+    an_prob.do_pairings()

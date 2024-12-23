@@ -22,6 +22,8 @@ class AnalyticalProbability(ProbabilityCalculator):
     def eq_base_int(self, L, interval, theta, offset):
         sign = (-1)**(interval.is_neg)
         return self.eq_base(L, theta, sign, interval.pivoted, offset)
+    def _sort_intervals_by_lb(self, list_of_intervals):
+        list_of_intervals.sort(key = lambda interval: interval.lb)
 
     def solve_thresholds(self):
         thresh_solver = eq.ThresholdSolver(self.threshs)

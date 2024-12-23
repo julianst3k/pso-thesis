@@ -97,8 +97,6 @@ class AnalyticalMISO(AnalyticalProbability):
         sign = (-1)**(interval.is_neg)
         return self.eq_offset(L, theta, sign, interval.pivoted, offset, interval.ub_over_pi)
 
-    def _sort_intervals_by_lb(self, list_of_intervals):
-        list_of_intervals.sort(key = lambda interval: interval.lb)
 
 
     def print_intervals(self, intervals):
