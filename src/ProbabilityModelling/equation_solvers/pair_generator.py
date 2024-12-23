@@ -82,7 +82,6 @@ class SIMOPairGenerator:
             try:
                 lower = parameters.eq_base(sol1, lower_angle, -1, is_offset = offset)
                 upper = parameters.eq_base(sol1, upper_angle, 1)
-                print(lower, upper, offset)
                 if np.abs(lower-upper) < tol:
                     # Aceptar solucion, corta arriba o abajo?
                     try:
