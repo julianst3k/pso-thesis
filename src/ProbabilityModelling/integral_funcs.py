@@ -416,7 +416,7 @@ class MISOBaseIntegrator:
         self.params = parameters
     def acos_integrator(self, triang):
         theta_bot, theta_top = triang.ang_low, triang.ang_high
-        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas()
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear()
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
         return (theta_top-theta_bot)*sum_int
     def integral_lambdas_linear(self):
@@ -839,10 +839,11 @@ class TriangleIntegrator:
         X, Y = self.rect.X, self.rect.Y
         area = 0
         tot_int = 0
-        for triang, lims in list_of_lims:
+        for triang in list_of_lims:
+            lims = list_of_lims[triang]
             for lim in lims:
                 interv_bot, interv_top = lim
-                integral = interv_top.integrate_ub(triang, parameters)/(2*pi) - interv_bot.integrate_lb(triang, parameters)/(2*pi)
+                integral = interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
                 tot_int += integral * triang.get_area()
             area += triang.get_area()
         return tot_int/area

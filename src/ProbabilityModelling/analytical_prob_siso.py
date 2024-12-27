@@ -86,7 +86,7 @@ class AnalyticalProbability(ProbabilityCalculator):
                     continue
         self._sort_intervals_by_lb(return_interval)
         return return_interval
-    def interval_pairing(self, first_set, second_set):
+    def interval_pairing(self, first_set, second_set, debug = False):
         """
         It is assumed that both first and second sets are ordered
         """
@@ -96,6 +96,8 @@ class AnalyticalProbability(ProbabilityCalculator):
             not_completed = current_interval < len(second_set)
             while not_completed:
                 curr = second_set[current_interval]
+                if debug:
+                    print(curr, "Pairing")
                 if inter.ub < curr.ub:
                     if inter.ub < curr.lb:
                         """
@@ -114,9 +116,11 @@ class AnalyticalProbability(ProbabilityCalculator):
                         current_interval += 1 
                         not_completed = current_interval < len(second_set)
                     else:
-                        new_inter = inter.inverse_divided_interval(curr.ub) # We discard the lower half
-                        if inter.lb >= curr.lb:
+                        new_inter = inter.inverse_divided_interval(curr.ub)
+                        if new_inter.lb >= curr.lb:
                             _ = curr.inverse_divided_interval(new_inter.lb)
+                        else:
+                            _ = new_inter.inverse_divided_interval(curr.lb)
                         return_interval.append([new_inter, curr])
                         current_interval += 1
                         not_completed = current_interval < len(second_set)

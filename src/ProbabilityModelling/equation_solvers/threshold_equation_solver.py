@@ -11,7 +11,6 @@ class ThresholdSolver:
             parameters.from_one = True
             self.threshs = self.threshs[::-1]
             parameters.threshs = self.threshs
-        print(parameters.from_one)
         filled = False
         for thresh in self.threshs:
             u = thresh["thr"]
@@ -37,7 +36,6 @@ class ThresholdSolver:
             if L1 == None and not filled and not parameters.from_one:
                 lims.append(IntegrationLimit(None, np.sqrt(parameters.X**2+parameters.Y**2), thresh["consts"]))
                 filled = True
-            print(lims[-1], L1, L2)
         lims.sort(key= lambda x: x.sort_radius())
 
 
@@ -143,6 +141,7 @@ class ThresholdSolver:
         output_array.sort(key= lambda x: x.sort_radius())
 
     def _solve_lims_offset_theta(self, theta, thresh_res, parameters, output_array):
+
         filled = False
         costh = np.cos(theta)
         center = -parameters.d*costh # Cute center
@@ -214,7 +213,9 @@ class ThresholdSolver:
                 output_array.append(IntegrationLimit(output_array[-1].high, np.sqrt(parameters.X**2+parameters.Y**2), constant))
         if remove_index is not None:
             del output_array[remove_index]
+        
         output_array = filter(lambda x: np.abs(x.high - x.low) > 0.001 and x.high > x.low, output_array)
+        
 
     def _solve_quadratic(self, a, b, c, u, parameters, func=None, theta=None, ignore_negatives = True):
         args = {}

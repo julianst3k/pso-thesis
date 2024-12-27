@@ -54,13 +54,13 @@ class AnalyticalMISO(AnalyticalProbability):
 
     def _offset_base_pair_generator(self, theta = None):
         self._interval_limits_generator(theta)
+        debug = False
         if theta is not None:
             self.base_offset_pairs = self.interval_pairing(self.sol_base_equations, self.sol_offset_equations)
         else:
             self.base_offset_pairs = {}
             for triangle in self.rect:
-                self.base_offset_pairs[triangle] = self.interval_pairing(self.sol_base_equations[triangle], self.sol_offset_equations[triangle])
-
+                self.base_offset_pairs[triangle] = self.interval_pairing(self.sol_base_equations[triangle], self.sol_offset_equations[triangle], debug = debug)
     @_modulus_solver
     def _solve_base_wrapper(self, theta = None):
         base_solver = eq.ArccosEquationSolver(self.threshs)
@@ -86,9 +86,10 @@ class AnalyticalMISO(AnalyticalProbability):
             self.lims[triangle] = aux_array
         
     def eq_offset(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
-        epsilon = 0.001 # Relevant to avoid floating problems
+        epsilon = 0.01 # Relevant to avoid floating problems
         acos_arg = (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)
         if acos_arg > 1+epsilon:
+            print(acos_arg, L, theta)
             raise OutOfUnitaryBound
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
         acos_arg = max(min(1, acos_arg),-1)
@@ -105,45 +106,9 @@ class AnalyticalMISO(AnalyticalProbability):
     
     
 
-    def interval_pairing(self, first_set, second_set):
-        """
-        It is assumed that both first and second sets are ordered
-        """
-        current_interval = 0
-        return_interval = []
-        for i, inter in enumerate(first_set):
-            not_completed = current_interval < len(second_set)
-            while not_completed:
-                curr = second_set[current_interval]
-                if inter.ub < curr.ub:
-                    if inter.ub < curr.lb:
-                        """
-                        In this case, the interval is dismissed because no interval is intersecting
-                        """
-                        break
-                    else:
-                        if inter.lb <= curr.lb:
-                            _ = inter.inverse_divided_interval(curr.lb) # We discard the lower half
-                        new_curr = curr.inverse_divided_interval(inter.ub)
-                        return_interval.append([inter, new_curr])
-
-                        break
-                else:
-                    if inter.lb > curr.ub:
-                        current_interval += 1 
-                        not_completed = current_interval < len(second_set)
-                    else:
-                        new_inter = inter.inverse_divided_interval(curr.ub) # We discard the lower half
-                        if inter.lb >= curr.lb:
-                            _ = curr.inverse_divided_interval(new_inter.lb)
-                        return_interval.append([new_inter, curr])
-                        current_interval += 1
-                        not_completed = current_interval < len(second_set)
-        return return_interval
+    
     def _lower_upper_pairs_generator(self, interval_pairs, theta):
         output = []
-        for interval_pair in interval_pairs:
-            print(interval_pair[0], interval_pair[1])
         for interval_pair in interval_pairs:
             base_pair = interval_pair[0]
             offset_pair = interval_pair[1]
@@ -208,6 +173,9 @@ class AnalyticalMISO(AnalyticalProbability):
         integral = 0
         pairs_dict = {}
         for triangle in self.rect:
+            if triangle.avg_ang > 2.93 and triangle.avg_ang < 2.94:
+                for pair in self.base_offset_pairs[triangle]:
+                    print(pair[1])
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
             pairs_dict[triangle] = pairs
         integral = integrator(pairs_dict, self)

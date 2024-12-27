@@ -228,12 +228,10 @@ class NewtonRaphson:
                     keep_xl = False
             solved_r = abs(xr_func) < tol and xr >= self.llow and xr <= self.lhigh
             solved_l = abs(xl_func) < tol and xl >= self.llow and xl <= self.lhigh
-            print(xr, xl)
         if not solved_r:
             xr = False
         if not solved_l:
             xl = False
-        print(f"Solution {xr}, {xl}")
         if np.abs(xr-xl) < 0.01:
             return xr, False
         return xr, xl 

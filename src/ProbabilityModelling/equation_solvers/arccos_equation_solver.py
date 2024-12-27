@@ -37,7 +37,6 @@ class ArccosEquationSolver:
         interval_solver = IntervalOffsetSolver()
         output = []
         costh = np.cos(theta)
-        print(costh)
         b = 2*parameters.sinbeta*costh*parameters.a
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
@@ -183,7 +182,6 @@ class ArccosEquationSolver:
         L2_is_lb = False
         L1_is_lb = False
         L1_is_ub = False
-        print(theta, L1, L2, pivot_point)
         if L1 < lmin if not pivot else pivot_point:
             """
                 As we saw before, it can only be below np.pi!

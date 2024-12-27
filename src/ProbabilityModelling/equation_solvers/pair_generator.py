@@ -320,7 +320,6 @@ class PairSolver:
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
         is_lb = False
-        print("Solving Min Equation")
         s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb)
         func_val = self.func(low+0.001, self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
@@ -363,7 +362,6 @@ class PairSolver:
             """
             Two solutions
             """
-            print(self.theta, s1, s2)
             if max_interval_one == base_min:
                 new_one = base_min.divide_interval(s1)
                 offset_min.ub = s2
@@ -423,7 +421,6 @@ class PairSolver:
             
         min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
         offset_max)
-        print("Breaking point", breaking_point)
         higher_set = self._breaking_point_insertion(min_intervs_one, min_intervs_two, breaking_point, base_max, offset_max)
         output_sets = self.int_gen.interval_sorter_generation(higher_set, lower_set)
         
@@ -463,7 +460,6 @@ class PairSolver:
         min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
         offset_max)
         higher_set = self._breaking_point_insertion(min_intervs_one, min_intervs_two, breaking_point, base_max, offset_max)
-        print("Higher Set", higher_set[0])
         unf_res_intervs = [self._check_max_min(max(maxi.lb, lower_bound.lb), min(maxi.ub, lower_bound.ub), lower_bound.push_functional_interval(True), maxi) for maxi in higher_set]
         res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
         return res_intervs
@@ -472,7 +468,6 @@ class PairSolver:
         offset_min = pair[1].push_functional_interval(True)
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
         lower_set = self._breaking_point_insertion(max_interval_one, max_interval_two, breaking_point, base_min, offset_min)
-        print("Lower Set", lower_set[0])
         unf_res_intervs = [self._check_max_min(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub), mini, upper_bound.push_functional_interval(False)) for mini in lower_set]
         res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
         return res_intervs
@@ -486,7 +481,7 @@ class PairSolver:
                 output_array.append([interv[0], interv[1]])
             else:
                 center_checked_interval = self._check_center(interv[1].lb, interv[1].ub, interv[1], interv[2])
-                interval_gen = self.center_interval_generator(interv[0].lb, interv[0].ub, interv[0], interv[3], center_checked_interval)
+                interval_gen = self.int_gen.center_interval_generator(interv[0].lb, interv[0].ub, interv[0], interv[3], center_checked_interval)
                 output_array.append(interval_gen)
         return output_array
     
