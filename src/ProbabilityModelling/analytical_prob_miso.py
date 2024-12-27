@@ -206,9 +206,11 @@ class AnalyticalMISO(AnalyticalProbability):
         self._offset_base_pair_generator()
         integrator = TriangleIntegrator(self.rect)
         integral = 0
+        pairs_dict = {}
         for triangle in self.rect:
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
-            integral += integrator(pairs, self)
+            pairs_dict[triangle] = pairs
+        integral = integrator(pairs_dict, self)
         return integral
 
 
@@ -221,7 +223,7 @@ class AnalyticalMISO(AnalyticalProbability):
             for interv in self.sol_offset_equations[triang]:
                 if interv.lb <= triang.max_r:
                     print(str(interv)+f'Integrate {interv._integrate_debug(triang, self)}')
-
+    
     
 if __name__ == "__main__":
     beta = np.pi/180*45
@@ -241,7 +243,6 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
-    an_prob.integral_debug()
-    print(f"A: {an_prob.a}, B: {an_prob.b**2}, d: {an_prob.d}, cos: {an_prob.cosfov}, sin: {an_prob.sinbeta}")
+    print(an_prob.integrate())
 
 

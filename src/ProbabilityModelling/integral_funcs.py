@@ -436,39 +436,44 @@ class MISOBaseIntegrator:
         return (theta_top-theta_bot)*(self.ub**2-self.lb**2)*np.pi/2
 
 
+
+
 class NonOriginIntegrator:
-    def __init__(self, lb, ub, consts, parameters):
+    def __init__(self, lb, ub, consts, parameters, reverse = False):
         self.lb = lb
         self.ub = ub
         self.consts = consts
         self.params = parameters
+        self.reverse = reverse
     def integral_even(self, Dn, theta_bot, theta_top, theta_crt, n):
+        reverse = self.reverse
         max_Dn = Dn/np.cos(theta_top)
         if self.ub > max_Dn:
-            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n)*1/np.pi
+            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
             print(f"The cosine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_cosine(Dn, theta_bot, theta_top, n)*2/(Dn**2*np.tan(theta_crt))*1/np.pi}", Dn**2*np.tan(theta_crt))
             return integral, theta_top
         elif self.ub < Dn:
-            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi
+            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
             print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_linear(Dn, theta_bot, theta_top, n)}")
             return integral, None
         else:
             theta_mid = np.arccos(Dn/self.ub)
             if theta_mid < theta_top:
                 theta_mid = theta_top
-            cosine_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n)*1/np.pi
-            linear_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n)*1/np.pi
+            cosine_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
+            linear_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
             print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_mid},{theta_top}] amounts to {self.integral_linear(Dn, theta_mid, theta_top, n)}")
             print(f"The cosine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_mid}] amounts to {self.integral_cosine(Dn, theta_bot, theta_mid, n)}")
             return cosine_int+linear_int, theta_mid
     def integral_odd(self, Dn, theta_bot, theta_top, theta_crt, n):
+        reverse = self.reverse
         max_Dn = Dn/np.sin(theta_bot)
         if self.ub > max_Dn:
-            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n)*1/np.pi
+            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
             print(f"The sine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_sine(Dn, theta_bot, theta_top, n)*2/(Dn**2*cotan(theta_crt))*1/np.pi}", Dn**2*cotan(theta_crt))
             return integral, theta_bot
         elif self.ub < Dn:
-            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n)*1/np.pi
+            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
             print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_top}] amounts to {self.integral_linear(Dn, theta_bot, theta_top, n)}")
             return integral, None
         else:
@@ -476,26 +481,26 @@ class NonOriginIntegrator:
             if theta_mid > theta_top:
                 theta_mid = theta_top
             
-            sine_int = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n)*1/np.pi
-            linear_int = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n)*1/np.pi
+            sine_int = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
+            linear_int = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
             print(f"The linear integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_bot},{theta_mid}] amounts to {self.integral_linear(Dn, theta_bot, theta_mid, n)}")
             print(f"The sine integral from {self.lb} to {self.ub}, with max radius {Dn}, angles: [{theta_mid},{theta_top}] amounts to {self.integral_sine(Dn, theta_mid, theta_top, n)}")
 
             return sine_int+linear_int, theta_mid
 
-    def integral_cosine(self, Dn, theta_bot, theta_top, n):
-        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear()
-        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_cosine(Dn)
+    def integral_cosine(self, Dn, theta_bot, theta_top, n, reverse = False):
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
+        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_cosine(Dn, reverse)
         inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
         outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
         #print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
         #print(f"Innter sum {inner_sum}")
         #print(f"Outer sum {outer_sum}, Terms: \n - 1 {(sum_int_one(theta_top)-sum_int_one(theta_bot))+-sum_int_a(self.lb)*(theta_top-theta_bot)+sum_int_two(theta_bot, theta_top)} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}")
         return outer_sum+inner_sum
-    def integral_sine(self, Dn, theta_bot, theta_top, n):
+    def integral_sine(self, Dn, theta_bot, theta_top, n, reverse = False):
 
-        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear()
-        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_sine(Dn)
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
+        sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_sine(Dn, reverse)
         inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
         outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
         #print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
@@ -503,11 +508,11 @@ class NonOriginIntegrator:
         #print(f"Outer sum {outer_sum}, Terms: \n - 1 {sum_int_one(theta_top)-sum_int_one(theta_bot)} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}")
         return outer_sum+inner_sum
     
-    def integral_linear(self, Dn, theta_bot, theta_top, n):
-        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear()
+    def integral_linear(self, Dn, theta_bot, theta_top, n, reverse = False):
+        sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
         return (theta_top-theta_bot)*sum_int
-    def integral_lambdas_cosine(self, Dn, debug = False):
+    def integral_lambdas_cosine(self, Dn, reverse, debug = False):
         """
             All the functions relation to solving the integral of the function Gn(Dn/cos(x))
             Gn(x) = X(X^2+b^2)^0.5 + ln((X^2+b^2)^0.5+X) - X + X^2
@@ -521,6 +526,9 @@ class NonOriginIntegrator:
             sigma = Dn/self.params.b
             ap = self.params.a 
             bp = self.params.b
+            alpha = self.params.alpha if reverse else -self.params.alpha
+            pi_ct = np.pi if reverse else 0
+
         else:
             cosfov = 1
             sinbeta = 1
@@ -533,9 +541,9 @@ class NonOriginIntegrator:
         np.sqrt(1+sigma**2)*sp.special.ellipkinc(t, (1/(1+sigma**2)))-np.sqrt(1+sigma**2)*sp.special.ellipeinc(t, (1/(1+sigma**2)))))
         sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_cos(tb, tt, Dn)/2
         sum_int_three = lambda t: -ap/sinbeta*Dn*self.log_cos(t)*a
-        sum_int_four = lambda t: b*Dn**2/2*np.tan(t)
+        sum_int_four = lambda t: (b+alpha/2+pi_ct)*Dn**2/2*np.tan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
-    def integral_lambdas_sine(self, Dn, debug = False):
+    def integral_lambdas_sine(self, Dn, reverse, debug = False):
         """
             All the functions relation to solving the integral of the function Gn(Dn/sin(x))
             Gn(x) = X(X^2+b^2)^0.5 + ln((X^2+b^2)^0.5+X) - X + X^2
@@ -549,6 +557,8 @@ class NonOriginIntegrator:
             sigma = Dn/self.params.b
             ap = self.params.a 
             bp = self.params.b
+            alpha = self.params.alpha if reverse else -self.params.alpha
+            pi_ct = np.pi if reverse else 0
         else:
             cosfov = 1
             sinbeta = 1
@@ -561,7 +571,7 @@ class NonOriginIntegrator:
         (sigma+1/sigma)*sp.special.ellipkinc(t, -1/sigma**2)-sigma*sp.special.ellipeinc(t, -1/sigma**2)))
         sum_int_two = lambda tb, tt: cosfov/sinbeta*a*self.sinh_int_sin(tb, tt, Dn)/2
         sum_int_three = lambda t: -ap/sinbeta*Dn*np.log(np.sin(t/2)/np.cos(t/2))*a
-        sum_int_four = lambda t: -b*Dn**2/2*cotan(t)
+        sum_int_four = lambda t: -(b+alpha/2+pi_ct)*Dn**2/2*cotan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
     def sinh_int_cos(self, tb, tt, Dn, max_order = 10, debug = False):
         """
@@ -740,14 +750,16 @@ class NonOriginIntegrator:
         return base + summ 
     def log_cos(self, t):
         return np.log((np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2)))
-    def integral_lambdas_linear(self):
+    def integral_lambdas_linear(self, reverse):
         a = self.consts["a"]
         b = self.consts["b"]
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
+        alpha = self.params.alpha if reverse else -self.params.alpha
+        pi_ct = np.pi if reverse else 0
         sum_int_a = lambda x: a*(0.5*cosfov/sinbeta*(x*np.sqrt(x**2+self.params.b**2)+self.params.b**2*np.log(np.sqrt(x**2+self.params.b**2)+x)))
         sum_int_b = lambda x: -self.params.a/sinbeta*x*a
-        sum_int_c = lambda x: b*x**2/2
+        sum_int_c = lambda x: (b+alpha/2+pi_ct)*x**2/2
         return sum_int_a, sum_int_b, sum_int_c
 
 class OriginIntegrator:
@@ -803,9 +815,17 @@ class RectangleIntegrator:
         integrator = OriginIntegrator(L1)
         return integrator
     @_integrate
-    def non_origin_integrator(self, L1, L2, consts, parameters):
-        integrator = NonOriginIntegrator(L1, L2, consts, parameters)
+    def non_origin_integrator(self, L1, L2, consts, parameters, reverse = False):
+        integrator = NonOriginIntegrator(L1, L2, consts, parameters, reverse)
         return integrator
+    def pair_integrator(self, L1, L2, consts, parameters, reverse):
+        if consts == 1:
+            return self.origin_integrator(L1)
+        arccos_integrated = self.non_origin_integrator(L1,L2,consts,parameters,reverse)
+        return arccos_integrated
+
+        
+
 class TriangleIntegrator:
     def __init__(self, rect):
         self.rect = rect

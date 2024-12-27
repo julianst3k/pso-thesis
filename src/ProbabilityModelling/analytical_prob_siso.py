@@ -11,14 +11,19 @@ class AnalyticalProbability(ProbabilityCalculator):
         self.Y = Y
         self.threshs = threshs
         self.from_one = False
+        self.alpha = 0
         self.solve_thresholds()
 
     def arg_acos(self, u):
         return (self.cosfov*np.sqrt(u**2+self.b**2)-self.a)/(u*self.sinbeta)
     def eq_base(self, L, theta, neg=1, pivot = False, is_offset = False):
-        if np.abs((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta)) > 1:
+        ct = (self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta)
+        if np.abs(ct)-1 > 1e-4:
             raise OutOfUnitaryBound
-        return  2*np.pi*is_offset + neg*np.arccos((self.cosfov*np.sqrt(L**2+self.b**2)-self.a)/(L*self.sinbeta))-theta
+        elif np.abs(ct) > 1:
+            ct = np.abs(ct)/ct 
+        
+        return  2*np.pi*is_offset + neg*np.arccos(ct)-theta
     def eq_base_int(self, L, interval, theta, offset):
         sign = (-1)**(interval.is_neg)
         return self.eq_base(L, theta, sign, interval.pivoted, offset)

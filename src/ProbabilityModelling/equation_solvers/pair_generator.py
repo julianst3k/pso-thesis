@@ -51,7 +51,6 @@ class SIMOPairGenerator:
         up_ph = None
         sol2 = sol2 if sol2 >= self.llow and sol2 <= self.lhigh else None
         sol1 = sol1 if sol1 >= self.llow and sol1 <= self.lhigh else None
-        print(sol1, sol2)
         if sol2 is not None:
             try:
                 lower = parameters.eq_base(sol2, lower_angle, -1, is_offset = offset)
@@ -357,12 +356,14 @@ class PairSolver:
         func = lambda x, *args: interv_top.gen_func(self.parameters)(x, interv_top, self.theta, interv_top.offset_lb if reverse else interv_top.offset_ub) - interv_bottom.gen_func(self.parameters)(x, interv_bottom, self.theta, interv_bottom.offset_ub if reverse else interv_bottom.offset_lb)
         dfunc = lambda x, *args: interv_top.gen_dfunc(self.parameters)(x, interv_top, self.theta) - interv_bottom.gen_dfunc(self.parameters)(x, interv_bottom, self.theta)
         newton = NewtonRaphson(low, high, func, dfunc, self.parameters)
+        #max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
         s1, s2 = newton.solve(self.theta, interv_bottom, interv_top)
         func_val = func(low+0.001)
         if s1 and s2:
             """
             Two solutions
             """
+            print(self.theta, s1, s2)
             if max_interval_one == base_min:
                 new_one = base_min.divide_interval(s1)
                 offset_min.ub = s2
@@ -572,47 +573,47 @@ class PairIntervalGenerator:
             lb_interv = res_lb[j] 
             if ub_interv[0].lb > lb_interv[0].lb:
                 if lb_interv[0].ub > ub_interv[0].lb:
-                    lower_lb_solo, upper_lb_solo = self._inverse_divide_pair_wrapper(ub_interv[0].lb, lb_interv)
+                    lower_lb_solo, upper_lb_solo = self.inverse_divide_pair_wrapper(ub_interv[0].lb, lb_interv)
                     output_array.append([lower_lb_solo,upper_lb_solo, None, None])
                 else:
                     output_array.append([lb_interv[0],lb_interv[1], None, None])
                     j+=1
                     cap = j < len(res_lb)
                 if ub_interv[0].ub < lb_interv[0].ub:
-                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])
                     break
 
                 else:
-                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
                     j+=1 
                     cap = j < len(res_lb)
                     
             elif ub_interv[0].lb < lb_interv[0].lb:
                 if lb_interv[0].lb < ub_interv[0].ub:
-                    lower_ub_solo, upper_ub_solo = self._inverse_divide_pair_wrapper(lb_interv[0].lb, ub_interv)
+                    lower_ub_solo, upper_ub_solo = self.inverse_divide_pair_wrapper(lb_interv[0].lb, ub_interv)
                     output_array.append([None,None, lower_ub_solo, upper_ub_solo])
                 else:
                     output_array.append([None, None, ub_interv[0], ub_interv[1]])
                     break
                 if ub_interv[0].ub > lb_interv[0].ub:
-                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
                     j+=1
                     cap = j < len(res_lb)
                 else:
-                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired, upper_lb_paired, ub_interv[0], ub_interv[1]])
                     break
             else:
                 if ub_interv[0].ub > lb_interv[0].ub:
-                    lower_ub_paired, upper_ub_paired = self._inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
+                    lower_ub_paired, upper_ub_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_ub_paired, upper_ub_paired])
                     j+=1
                     cap = j < len(res_lb)
                 else:
-                    lower_lb_paired, upper_lb_paired = self._inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
+                    lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])
                     break
         return j

@@ -28,10 +28,19 @@ class AnalyticalSIMO(AnalyticalProbability):
             if extra_pair_generated is not None:
                 self.base_simo_pairs.append(extra_pair_generated)
         self.base_simo_pairs.sort(key =  lambda x: x[0].lb)
+    def integrate(self):
+        self.do_pairings()
+        integral = 0
+        integrator = RectangleIntegrator(self.rect)
         for pair in self.base_simo_pairs:
-            print(pair[0])
-            print(pair[1]) 
-    
+            if pair[1].offset_lb:
+                integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, False)
+                integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, True)
+            else:
+                 integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, False)
+        print(integral)
+        return integral
+
 if __name__ == "__main__":
     beta = np.pi/180*45
     fov = np.pi/180*45
@@ -51,4 +60,4 @@ if __name__ == "__main__":
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalSIMO(X, Y, x_c, y_c, fov, beta, h, r, threshs, alpha)
     #print([triang.max_r for triang in an_prob.rect])
-    an_prob.do_pairings()
+    an_prob.integrate()
