@@ -199,7 +199,7 @@ class NewtonRaphson:
         xr_dfunc = dfunc(xr, *args)
         return xr_func, xr_dfunc
 
-    def solve(self, theta, interval_base, interval_offset, is_lb = False):
+    def solve(self, theta, interval_base, interval_offset, is_lb = False, debug = False):
         xr = self.llow
         xl = self.lhigh
         keep_xr = True
@@ -207,10 +207,9 @@ class NewtonRaphson:
         solved_r = False
         solved_l = False
         tol = 1e-4
-        while keep_xr and keep_xl:
-            xr_func, xr_dfunc = self.obtain_func_and_d(xr, theta, interval_base, interval_offset, is_lb)
-            xl_func, xl_dfunc = self.obtain_func_and_d(xl, theta, interval_base, interval_offset, is_lb)
+        while keep_xr or keep_xl:
             if keep_xr:
+                xr_func, xr_dfunc = self.obtain_func_and_d(xr, theta, interval_base, interval_offset, is_lb)
                 try:
                     if keep_xr:
                         xr -= xr_func/xr_dfunc
@@ -219,6 +218,7 @@ class NewtonRaphson:
                 if xr < self.llow or xr > self.lhigh or abs(xr_func) < tol or np.abs(xr_dfunc) < tol:
                     keep_xr = False
             if keep_xl:
+                xl_func, xl_dfunc = self.obtain_func_and_d(xl, theta, interval_base, interval_offset, is_lb)
                 try:
                     xl -= xl_func/xl_dfunc
                 except ZeroDivisionError:
@@ -226,6 +226,8 @@ class NewtonRaphson:
 
                 if xl > self.lhigh or xl < self.llow or abs(xl_func) < tol or np.abs(xl_func) < tol:
                     keep_xl = False
+            if debug:
+                print(xr, xl)
             solved_r = abs(xr_func) < tol and xr >= self.llow and xr <= self.lhigh
             solved_l = abs(xl_func) < tol and xl >= self.llow and xl <= self.lhigh
         if not solved_r:

@@ -173,11 +173,15 @@ class AnalyticalMISO(AnalyticalProbability):
         integral = 0
         pairs_dict = {}
         for triangle in self.rect:
-            if triangle.avg_ang > 2.93 and triangle.avg_ang < 2.94:
-                for pair in self.base_offset_pairs[triangle]:
-                    print(pair[1])
+            for pair in self.base_offset_pairs[triangle]:
+                print(pair[0])
+                print(pair[1])
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
             pairs_dict[triangle] = pairs
+            for pair in pairs_dict[triangle]:
+                print(pair[0])
+                print(pair[1])
+            break
         integral = integrator(pairs_dict, self)
         return integral
 

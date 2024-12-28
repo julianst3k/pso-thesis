@@ -8,6 +8,7 @@ class PairGenerator:
     def __init__(self, theta, interval: Interval, offset: OffsetInterval, func, dfunc, parameters):
         self.llow = max(interval.lb, offset.lb)
         self.lhigh = min(interval.ub, offset.ub)
+        print(self.llow, self.lhigh, interval, offset)
         self.theta = theta
         self.func = func
         self.dfunc = dfunc
@@ -262,6 +263,9 @@ class PairTreeGenerator:
                 [max(lb,lbd),min(ub,ubd)]
             """
             output_sets = self.pair_solver._min_max_finder(self.pairs)
+            print("Solver")
+            for interv in output_sets[0]:
+                print(interv)
             res_intervs = [self.pair_solver._check_max_min(max(mini.lb, maxi.lb), min(mini.ub, maxi.ub), mini, maxi) for mini, maxi in output_sets]
         filtered_output = self.int_gen.pair_filtering(res_intervs)
         return filtered_output
@@ -286,7 +290,7 @@ class PairSolver:
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
         is_lb = True
-        s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb)
+        s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb, debug = True)
         func_val = self.func(low+0.001, self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
             """
@@ -355,7 +359,9 @@ class PairSolver:
         func = lambda x, *args: interv_top.gen_func(self.parameters)(x, interv_top, self.theta, interv_top.offset_lb if reverse else interv_top.offset_ub) - interv_bottom.gen_func(self.parameters)(x, interv_bottom, self.theta, interv_bottom.offset_ub if reverse else interv_bottom.offset_lb)
         dfunc = lambda x, *args: interv_top.gen_dfunc(self.parameters)(x, interv_top, self.theta) - interv_bottom.gen_dfunc(self.parameters)(x, interv_bottom, self.theta)
         newton = NewtonRaphson(low, high, func, dfunc, self.parameters)
-        #max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
+        base_min = interv_bottom
+        offset_min = interv_top
+        max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
         s1, s2 = newton.solve(self.theta, interv_bottom, interv_top)
         func_val = func(low+0.001)
         if s1 and s2:
@@ -415,6 +421,8 @@ class PairSolver:
         offset_min = pair[1].push_functional_interval(True)
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, 
         offset_min)
+        print("Debugging: ")
+        print(f"Offset Min: {offset_min}, Max Interval One: {max_interval_one}, Breaking: {breaking_point}")
         lower_set = self._breaking_point_insertion(max_interval_one, max_interval_two, breaking_point, base_min, offset_min)
         base_max = pair[0].push_functional_interval(False)
         offset_max = pair[1].push_functional_interval(False)
