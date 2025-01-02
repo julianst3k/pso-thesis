@@ -44,12 +44,10 @@ class AnalyticalProbability(ProbabilityCalculator):
         integrator = RectangleIntegrator(self.rect)
         summ = 0
         for lim in self.lims:
-            print(f"La constantes son {lim.const} con {lim.low} a {lim.high}")
             if lim.const != 1:
                 summ += integrator.non_origin_integrator(lim.low, lim.high, lim.const, self)
             else:
                 summ += integrator.origin_integrator(lim.high)
-        print(self.b, self.a)
         return summ
 
     def divide_by_lims(self, list_of_intervals, list_of_thresholds):

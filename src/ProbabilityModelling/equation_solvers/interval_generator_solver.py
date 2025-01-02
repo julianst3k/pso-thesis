@@ -97,6 +97,8 @@ class IntervalOffsetSolver:
         """
         maxr = np.sqrt(parameters.X**2+parameters.Y**2) if pivot is None or pivoted else pivot
         floor = pivot if pivoted and pivot > 0 else 0
+        if theta > 3.08 and theta < 3.09:
+            print(pivoted, L1, L2)
         if flag == 0:
             
             interv = [OffsetInterval(L1, L2, floor, maxr, pivoted=pivoted)]
@@ -114,9 +116,11 @@ class IntervalOffsetSolver:
             
         if flag == 3:
             if L1.lb and L2.lb:
+                bool_off, val = self._get_offset_bool(L2.sol, theta, parameters, 1, pivoted = pivoted)
                 interv = [OffsetInterval(False, False, floor, L2.sol, pivoted=pivoted, over_pi = val), OffsetInterval(True, False, L2.sol, L1.sol, pivoted=pivoted), OffsetInterval(False, False, L1.sol, maxr, pivoted=pivoted, over_pi = val)]
 
             elif L1.ub and L2.ub:
+                bool_off, val = self._get_offset_bool(L2.sol, theta, parameters, -1, pivoted = pivoted)
                 interv = [OffsetInterval(True, True, floor, L2.sol, pivoted=pivoted, over_pi = val), OffsetInterval(True, False, L2.sol, L1.sol, pivoted=pivoted, over_pi = val), OffsetInterval(True, True, L1.sol, maxr, pivoted=pivoted, over_pi = val)]
         
             elif L1.ub:

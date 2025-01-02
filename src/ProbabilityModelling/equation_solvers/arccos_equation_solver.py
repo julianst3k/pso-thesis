@@ -6,7 +6,7 @@ class ArccosEquationSolver:
     def __init__(self, thresh):
         self.thresh = thresh
 
-    def solve_offset_equations(self, parameters, theta, Lmin):
+    def solve_offset_equations(self, parameters, theta, Lmin, lims = None):
         interval_solver = IntervalOffsetSolver()
         output = []
         d = parameters.d
@@ -15,6 +15,16 @@ class ArccosEquationSolver:
         costh = np.cos(theta)
         if theta >= np.pi/2 and theta <= 3/2*np.pi:
             pivot = -d/np.cos(theta)
+            if theta > 2.86 and theta < 2.87:
+                print(pivot, theta)
+            for lim in lims:
+                if lim.high < pivot:
+                    continue
+                elif lim.high > pivot and lim.low < pivot:
+                    break
+                else:
+                    pivot = lim.low 
+                    break
         else:
             pivot = None
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
@@ -26,14 +36,32 @@ class ArccosEquationSolver:
         if pivot is not None:
             b = (2*d*parameters.cosfov**2-2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
             c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2-2*parameters.a*d*parameters.sinbeta
-            L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= -d/np.cos(theta), lmin = -d/np.cos(theta))
+            
+            if pivot > -d/np.cos(theta):
+                b = (2*d*parameters.cosfov**2+2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
+                c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
+            L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= pivot, lmin = pivot)
+            if flagu == 0: 
+                oldL1, oldL2 = L1ap, L2ap
+                if pivot > -d/np.cos(theta): ## sols < lmin
+                    b = (2*d*parameters.cosfov**2-2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
+                    c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2-2*parameters.a*d*parameters.sinbeta
+                else:
+                    b = (2*d*parameters.cosfov**2+2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
+                    c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
+                L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= pivot, lmin = pivot)
+                if flagu == 0:
+                    L1ap, L2ap = oldL1, oldL2
+            if theta > 2.86 and theta < 2.87:
+                print(L1ap, L2ap, flagu, "hi")
+
             if flagu is None:
                 pivot = None
         output = interval_solver.offset_intervals_solver(L1bp, L2bp, L1ap, L2ap, pivot, theta, parameters, flagl, flagu)
 
         return output
 
-    def solve_base_equations(self, parameters, theta, Lmin):
+    def solve_base_equations(self, parameters, theta, Lmin, lims = None):
         interval_solver = IntervalOffsetSolver()
         output = []
         costh = np.cos(theta)
@@ -59,17 +87,18 @@ class ArccosEquationSolver:
             for triangle in kwargs.get("triangles"):
                 lmin = kwargs.get("lims")[triangle][0].low
                 theta = triangle.avg_ang
-                sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin)
+
+                sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin, kwargs.get("lims")[triangle])
             return sol_equations 
         return triangle_wrapper
     @solve_equations_triangle_wrapper
-    def solve_base_equations_triangles(self, parameters, theta, lmin):
+    def solve_base_equations_triangles(self, parameters, theta, lmin, lims = None):
         
-        return self.solve_base_equations(parameters, theta, lmin)
+        return self.solve_base_equations(parameters, theta, lmin, lims)
     @solve_equations_triangle_wrapper
-    def solve_offset_equations_triangles(self, parameters, theta, lmin):
+    def solve_offset_equations_triangles(self, parameters, theta, lmin, lims = None):
             
-        return self.solve_offset_equations(parameters, theta, lmin)
+        return self.solve_offset_equations(parameters, theta, lmin, lims)
     
     def _solve_quadratic_base(self, a, b, c, theta, parameters, lmin):
         """
@@ -78,16 +107,13 @@ class ArccosEquationSolver:
         
         """
         epsilon = 0.001
-
         if b**2-4*a*c < 0:
-            if parameters.cosfov*np.sqrt(parameters.d**2+parameters.b**2)-parameters.a < 0:
-                ub = parameters.eq_base(lmin, theta)
-                lb = parameters.eq_base(lmin, theta,neg=-1)
-                return lb < -np.pi, ub < -np.pi
+            ub = parameters.eq_base(lmin, theta)
+            lb = parameters.eq_base(lmin, theta,neg=-1)
+            return lb < -np.pi, ub < -np.pi
 
-                
-            
         sqrt = np.sqrt(b**2-4*a*c)
+
         if a>0:
             L1 = (-b+sqrt)/(2*a)
             L2 = (-b-sqrt)/(2*a)
@@ -157,12 +183,17 @@ class ArccosEquationSolver:
                 return the truth value
 
             """
-            ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
-            lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
-            """
-                As we saw before, it can only be below np.pi!
-            """
-            return lb < -np.pi, ub < -np.pi, 0
+            try:
+                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
+                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
+                """
+                    As we saw before, it can only be below np.pi!
+                """
+                return lb < -np.pi, ub < -np.pi, 0
+            except OutOfUnitaryBound:
+                ### In this case, -d/cos(theta) is not in the domain of arccos, so we need to find
+                ### The point that solves the equation for arg arccos = -1 or 1. 
+                ...
 
         sqrt = np.sqrt(b**2-4*a*c)
         if a>0:
@@ -182,7 +213,10 @@ class ArccosEquationSolver:
         L2_is_lb = False
         L1_is_lb = False
         L1_is_ub = False
-        if L1 < lmin if not pivot else pivot_point:
+        if theta > 2.86 and theta < 2.87:
+            print(L1, L2)
+
+        if L1 < (lmin if not pivot else pivot_point):
             """
                 As we saw before, it can only be below np.pi!
             """
@@ -200,7 +234,7 @@ class ArccosEquationSolver:
                     L1_is_lb = True
             else:
                 L1_is_ub = True
-        if L2 < lmin if not pivot else pivot_point:
+        if L2 < (lmin if not pivot else pivot_point):
             L2 = None
         else:
             if np.abs(parameters.eq_offset(L2, theta, pivot = pivot)+np.pi)>epsilon and np.abs(parameters.eq_offset(L2, theta, pivot = pivot)-np.pi)>epsilon:
@@ -214,6 +248,9 @@ class ArccosEquationSolver:
         
         sol_is_lb = L1_is_lb or L2_is_lb
         sol = L1 if L1 is not None else L2
+        if theta > 2.86 and theta < 2.87:
+            print(L1, L2, "passed")
+
         if L1 is not None and L2 is not None:
             return SolWrapper(L1, L1_is_lb, L1_is_ub), SolWrapper(L2, L2_is_lb, L2_is_ub), 3
         if sol is not None and sol>=0:

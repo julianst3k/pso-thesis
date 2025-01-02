@@ -89,7 +89,6 @@ class AnalyticalMISO(AnalyticalProbability):
         epsilon = 0.01 # Relevant to avoid floating problems
         acos_arg = (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)
         if acos_arg > 1+epsilon:
-            print(acos_arg, L, theta)
             raise OutOfUnitaryBound
         off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
         acos_arg = max(min(1, acos_arg),-1)
@@ -173,15 +172,18 @@ class AnalyticalMISO(AnalyticalProbability):
         integral = 0
         pairs_dict = {}
         for triangle in self.rect:
-            for pair in self.base_offset_pairs[triangle]:
-                print(pair[0])
-                print(pair[1])
+            #for pair in self.base_offset_pairs[triangle]:
+            #    print(pair[0])
+            #    print(pair[1])
+            if triangle.avg_ang > 2.87 and triangle.avg_ang < 2.89:
+                for pair in self.base_offset_pairs[triangle]:
+                    print(pair[0])
+                    print(pair[1], pair[1].pivoted)
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
             pairs_dict[triangle] = pairs
-            for pair in pairs_dict[triangle]:
-                print(pair[0])
-                print(pair[1])
-            break
+            #for pair in pairs_dict[triangle]:
+            #    print(pair[0])
+            #    print(pair[1])
         integral = integrator(pairs_dict, self)
         return integral
 

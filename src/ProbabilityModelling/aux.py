@@ -57,12 +57,12 @@ class ArbitraryTriangle:
 
     def get_area(self):
         if self.orientation == Orientation.HORIZONTAL:
-            low_tr = abs(self.x**2*np.tan(self.ang_low))
-            high_tr = abs(self.x**2*np.tan(self.ang_high))
+            low_tr = abs(self.x**2*np.tan(self.ang_low)/2)
+            high_tr = abs(self.x**2*np.tan(self.ang_high)/2)
             return abs(high_tr-low_tr)
         else:
-            low_tr = abs(self.y**2*cotan(self.ang_low))
-            high_tr = abs(self.y**2*cotan(self.ang_high))
+            low_tr = abs(self.y**2*cotan(self.ang_low)/2)
+            high_tr = abs(self.y**2*cotan(self.ang_high)/2)
             return abs(low_tr-high_tr)
     def __str__(self):
         return f'Triangle: {self.x}, {self.y}, {self.max_r}, {self.get_area()}, {self.ang_low}, {self.ang_high}, {self.orientation}'
@@ -226,8 +226,8 @@ class NewtonRaphson:
 
                 if xl > self.lhigh or xl < self.llow or abs(xl_func) < tol or np.abs(xl_func) < tol:
                     keep_xl = False
-            if debug:
-                print(xr, xl)
+            #if debug:
+                #print(xr, xl)
             solved_r = abs(xr_func) < tol and xr >= self.llow and xr <= self.lhigh
             solved_l = abs(xl_func) < tol and xl >= self.llow and xl <= self.lhigh
         if not solved_r:

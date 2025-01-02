@@ -1,5 +1,6 @@
 from integral_funcs import MISOOffsetIntegrator, MISOBaseIntegrator
 from enum import Enum
+import numpy as np
 
 class Bound(Enum):
     LOWER = 1
@@ -42,18 +43,7 @@ class Interval:
         return f'Offset Ub: {self.offset_ub}, Offset Lb: {self.offset_lb}, Lb: {self.lb}, Ub: {self.ub}, Consts: {self.consts}, Is_Offset: {self.is_offset}'
     def is_interval(self):
         return True
-    def integrate_lb(self, triang, parameters):
-        return self._integrate(triang, parameters, self.offset_lb, True)
-    def integrate_ub(self, triang, parameters):
-        return self._integrate(triang, parameters, self.offset_ub, False)
-    def _integrate(self, triang, parameters, offset, is_lb):
-        integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
-        acos_integral = (-1)**(is_lb)*integrator.acos_integrator(triang)
-        angle_integral = -integrator.angle_integrator(triang)
-        if offset:
-            pi_const_integral = integrator.pi_const_integrator(triang)
-            return (-1)**(is_lb)*acos_integral+2*pi_const_integral+angle_integral
-        return (-1)**(is_lb)*acos_integral+angle_integral
+        
 
 class OutOfUnitaryBound(Exception):
     ...
@@ -69,14 +59,14 @@ class FunctionalInterval(Interval):
         if self.is_offset:
             return params.eq_offset_int
         elif self.pi_interval:
-            return lambda x: (-1)**(not self.is_neg)*np.pi
+            return lambda x, *args: (-1)**(not self.is_neg)*np.pi
         else:
             return params.eq_base_int
     def gen_dfunc(self, params):
         if self.is_offset:
             return params.offset_derivative_int
         elif self.pi_interval:
-            return 0 
+            return lambda x, *args: 0
         else:
             return params.base_derivative_int
     def divide_interval(self, divider):
@@ -87,6 +77,30 @@ class FunctionalInterval(Interval):
         divided_lb = self.lb
         self.lb = divider
         return FunctionalInterval(self.offset_lb, self.offset_ub, divided_lb, divider, self.consts, self.pi_interval, self.is_offset, self.is_neg, self.pivoted, self.ub_over_pi)
+    def integrate_lb(self, triang, parameters):
+        return self._integrate(triang, parameters, self.offset_lb, False, True)
+    def integrate_ub(self, triang, parameters):
+        return self._integrate(triang, parameters, self.offset_ub, self.ub_over_pi, False)
+    def _integrate(self, triang, parameters, offset, over_pi, is_lb):
+        if self.is_offset:
+            integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+            acos_integral = integrator.acos_integrator(triang)
+            atan_integral = integrator.atan_integral(triang)
+            pi_const_integral = integrator.pi_const_integrator(triang)
+            if offset:
+                if over_pi:
+                    return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral-2*pi_const_integral
+                else:
+                    return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
+            return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
+        else:
+            integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+            acos_integral = integrator.acos_integrator(triang)
+            angle_integral = -integrator.angle_integrator(triang)
+            if offset:
+                pi_const_integral = integrator.pi_const_integrator(triang)
+                return (-1)**(is_lb)*acos_integral+2*pi_const_integral+angle_integral
+            return (-1)**(is_lb)*acos_integral+angle_integral
 
 class OffsetInterval(Interval):
     def __init__(self, offset_lb, offset_ub, lb, ub, pivoted=False, upper_func = None, lower_func = None, consts = {}, over_pi = False):
@@ -112,21 +126,6 @@ class OffsetInterval(Interval):
         divided_lb = self.lb
         self.lb = divider
         return OffsetInterval(self.offset_lb, self.offset_ub, divided_lb, divider, self.pivoted, self.upper_func, self.lower_func, self.consts, self.ub_over_pi)
-    def integrate_lb(self, triang, parameters):
-        return self._integrate(triang, parameters, self.offset_lb, False, True)
-    def integrate_ub(self, triang, parameters):
-        return self._integrate(triang, parameters, self.offset_ub, over_pi, False)
-    def _integrate(self, triang, parameters, offset, over_pi, is_lb):
-        integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
-        acos_integral = integrator.acos_integrator(triang)
-        atan_integral = integrator.atan_integrator(triang)
-        if offset:
-            pi_const_integral = integrator.pi_const_integrator(triang)
-            if over_pi:
-                return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral-2*pi_const_integral
-            else:
-                return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
-        return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
     def _integrate_debug(self, triang, parameters):
         integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
         acos_integral = integrator.acos_integrator(triang)
