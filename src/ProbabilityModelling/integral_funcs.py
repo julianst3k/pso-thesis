@@ -413,6 +413,7 @@ class MISOBaseIntegrator:
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
         return (theta_top-theta_bot)*sum_int
     def integral_lambdas_linear(self):
+        print(self.consts)
         a = self.consts["a"]
         b = self.consts["b"]
         cosfov = self.params.cosfov

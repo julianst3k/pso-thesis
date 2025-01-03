@@ -89,6 +89,7 @@ class ArccosEquationSolver:
                 theta = triangle.avg_ang
 
                 sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin, kwargs.get("lims")[triangle])
+ 
             return sol_equations 
         return triangle_wrapper
     @solve_equations_triangle_wrapper

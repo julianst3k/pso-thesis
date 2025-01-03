@@ -93,6 +93,10 @@ class FunctionalInterval(Interval):
                 else:
                     return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
             return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
+        if self.pi_interval:
+            integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+            pi_const_integral = integrator.pi_const_integrator(triang)
+            return (-1)**(is_lb)*pi_const_integral            
         else:
             integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
             acos_integral = integrator.acos_integrator(triang)

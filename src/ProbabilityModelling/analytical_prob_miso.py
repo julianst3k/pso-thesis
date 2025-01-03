@@ -24,6 +24,13 @@ class AnalyticalMISO(AnalyticalProbability):
                 for triangle in self.rect:
                     self._sort_intervals_by_lb(output[triangle])
                     output[triangle] = self.divide_by_lims(output[triangle], divider[triangle] if triangle in divider else divider)
+                    for sol in output[triangle]:
+                        if sol.lb == sol.ub:
+                            output[triangle].remove(sol)
+                    if triangle.avg_ang > 3.13 and triangle.avg_ang < 3.14:
+                        for sol in output[triangle]:
+                            print(sol)
+
             return output
         return _modulus_wrapper    
     def _generate_sol_offset_equations(self, theta = None):
@@ -60,6 +67,9 @@ class AnalyticalMISO(AnalyticalProbability):
         else:
             self.base_offset_pairs = {}
             for triangle in self.rect:
+                if triangle.avg_ang > 2.87 and triangle.avg_ang < 2.89:
+                    for sol in self.sol_offset_equations[triangle]:
+                        print(sol)
                 self.base_offset_pairs[triangle] = self.interval_pairing(self.sol_base_equations[triangle], self.sol_offset_equations[triangle], debug = debug)
     @_modulus_solver
     def _solve_base_wrapper(self, theta = None):
@@ -175,7 +185,8 @@ class AnalyticalMISO(AnalyticalProbability):
             #for pair in self.base_offset_pairs[triangle]:
             #    print(pair[0])
             #    print(pair[1])
-            if triangle.avg_ang > 2.87 and triangle.avg_ang < 2.89:
+            print(triangle.avg_ang)
+            if triangle.avg_ang > 3.13 and triangle.avg_ang < 3.14:
                 for pair in self.base_offset_pairs[triangle]:
                     print(pair[0])
                     print(pair[1], pair[1].pivoted)

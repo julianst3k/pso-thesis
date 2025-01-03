@@ -207,6 +207,8 @@ class NewtonRaphson:
         solved_r = False
         solved_l = False
         tol = 1e-4
+        if xr - xl < 0.01:
+            return False, False
         while keep_xr or keep_xl:
             if keep_xr:
                 xr_func, xr_dfunc = self.obtain_func_and_d(xr, theta, interval_base, interval_offset, is_lb)
