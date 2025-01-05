@@ -367,12 +367,13 @@ class MISOOffsetIntegrator:
                 summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
 
                 if i < 2:
-                    subsum[0] += lamb(xt, tt)-lamb(xt,tb)
+                    subsum[0] += lamb(xb, tt)-lamb(xb,tb)
                     
                 elif i == 2:
-                    subsum[1] += lamb(xt, tt)-lamb(xt,tb)
+                    subsum[1] += lamb(xb, tt)-lamb(xb,tb)
                 else:
-                    subsum[2] += lamb(xt, tt)-lamb(xt,tb)
+                    subsum[2] += lamb(xb, tt)-lamb(xb,tb)
+        #print(f"Atan subsums in {xt}. Approx: {subsum[0]}, Expansion: {subsum[2]}, Cos: {subsum[1]}")
         return summ
     def atan_lambdas(self, triang):
         """
@@ -396,10 +397,10 @@ class MISOOffsetIntegrator:
         d = self.params.d
         avg = triang.avg_ang
         lambda_list = []
-        lambda_list.append(lambda x, t: (x**2/2)*(approx_val(x,d,avg))*t+(x**2/2)*approx_der(x,d,avg)*(t**2/2-avg*t))
-        lambda_list.append(lambda x, t: -(d**2/2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
-        lambda_list.append(lambda x, t: -1/2*d*np.cos(t)*x)
-        lambda_list.append(lambda x, t: -fourth_lambda(x, d, t))
+        lambda_list.append(lambda x, t: (x**2/2)*(approx_val(d,x,avg))*t+(x**2/2)*approx_der(d,x,avg)*(t**2/2-avg*t))
+        lambda_list.append(lambda x, t: (d**2/2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
+        lambda_list.append(lambda x, t: 1/2*d*np.cos(t)*x)
+        lambda_list.append(lambda x, t: fourth_lambda(x, d, t))
         return lambda_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):
@@ -413,7 +414,6 @@ class MISOBaseIntegrator:
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
         return (theta_top-theta_bot)*sum_int
     def integral_lambdas_linear(self):
-        print(self.consts)
         a = self.consts["a"]
         b = self.consts["b"]
         cosfov = self.params.cosfov
@@ -829,20 +829,86 @@ class TriangleIntegrator:
             triang_subtot = 0 
             for lim in lims:
                 interv_bot, interv_top = lim
-                if triang.max_r < interv_bot.ub:
-                    interv_bot.ub = triang.max_r
-                    interv_top.ub = triang.max_r
-                if triang.max_r < interv_bot.lb:
-                    continue
-                integral = interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+                integral = self.integral_wrapper(lim, triang, parameters)
                 triang_subtot += integral
                 tot_int += integral
-            #print(triang_subtot/triang.get_area(), triang.avg_ang, lims)
+                if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
+                    print(triang_subtot)
             area += triang.get_area()
         return tot_int/area
     def __call__(self, list_of_lims, parameters):
         return self.wrapper_integrator(list_of_lims, parameters)
-    
+    def integral_wrapper(self, lims, triang, parameters):
+        lims_bot, lims_top = lims
+        try:
+            if len(lims_bot)>1:
+                summ = 0
+                for lim in lims:
+                    int_bot, int_top = lim
+                    summ += self.integral_routine(int_bot, int_top,triang,parameters)
+                return summ
+        except TypeError:
+            return self.integral_routine(lims_bot, lims_top,triang,parameters)
+    def integral_routine(self,interv_bot,interv_top,triang,parameters):
+        if triang.max_r < interv_bot.ub:
+            interv_bot.ub = triang.max_r
+            interv_top.ub = triang.max_r
+        if triang.max_r < interv_bot.lb:
+            return 0
+        if np.abs(interv_bot.ub-interv_bot.lb) < 1e-4 or np.abs(interv_top.ub-interv_top.lb) < 1e-4:
+            return 0
+        integral = self._pivoted_skipper(interv_top, interv_bot, triang, parameters)
+        if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
+            print(f"Integral with {interv_bot} to {interv_top}: {integral}, Top: {interv_top.integrate_ub(triang, parameters)/(2*np.pi)}, Bot: {interv_bot.integrate_lb(triang, parameters)/(2*np.pi)}")
+            #tot, arc, atan = interv_bot.riemman_integral(triang, parameters)
+            #print(f"Riemman Integral: {tot/(2*np.pi), arc, atan}")
+            #print(f"Angle top: {triang.ang_high}, Angle bot: {triang.ang_low}")
+            ...
+
+        return integral
+
+
+
+    def _pivoted_skipper(self, interv_top, interv_bot, triang, parameters):
+        integral = 0
+        d = parameters.d
+        r_min, r_max = -d/np.cos(triang.ang_high), -d/np.cos(triang.ang_low)
+        if r_min > r_max:
+            aux = r_min
+            r_min = r_max
+            r_max = aux
+
+        if interv_top.ub > r_max and interv_top.lb < r_min:
+            ub = interv_top.ub
+            interv_top.ub = r_min 
+            interv_bot.ub = r_min
+            interv_bot.pivoted = False
+            interv_top.pivoted = False
+            integral = interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+            interv_top.lb = r_max 
+            interv_bot.lb = r_max
+            interv_top.ub = ub
+            interv_bot.ub = ub
+            interv_bot.pivoted = True
+            interv_top.pivoted = True
+            integral += interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+        elif interv_top.ub < r_max and interv_top.lb > r_min:
+            integral += 0
+        elif interv_top.ub < r_max and interv_top.ub > r_min:
+            interv_top.ub = r_min 
+            interv_bot.ub = r_min
+            interv_bot.pivoted = False
+            interv_top.pivoted = False
+            integral = interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+        elif interv_top.lb < r_max and interv_top.lb > r_min:
+            interv_top.lb = r_max 
+            interv_bot.lb = r_max
+            interv_bot.pivoted = True
+            interv_top.pivoted = True
+            integral += interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+        else:
+            return interv_top.integrate_ub(triang, parameters)/(2*np.pi) - interv_bot.integrate_lb(triang, parameters)/(2*np.pi)
+        return integral 
 
 
         

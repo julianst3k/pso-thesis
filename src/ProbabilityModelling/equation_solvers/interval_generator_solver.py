@@ -53,10 +53,9 @@ class IntervalOffsetSolver:
                     else:
                         bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)
                         bool_off_ub, val = self._get_base_bool(L1.sol, theta, parameters, 1)
-
                         interv = [Interval(bool_off_lb, bool_off_ub, 0, maxr)]
-
         except AttributeError:
+
             interv = [Interval(L1, L2, 0, maxr)]
         return interv
 
@@ -97,8 +96,6 @@ class IntervalOffsetSolver:
         """
         maxr = np.sqrt(parameters.X**2+parameters.Y**2) if pivot is None or pivoted else pivot
         floor = pivot if pivoted and pivot > 0 else 0
-        if theta > 3.08 and theta < 3.09:
-            print(pivoted, L1, L2)
         if flag == 0:
             
             interv = [OffsetInterval(L1, L2, floor, maxr, pivoted=pivoted)]
@@ -141,12 +138,12 @@ class IntervalOffsetSolver:
             val = parameters.eq_offset(radius+0.01, theta, neg, pivoted)
         except OutOfUnitaryBound:
             val = parameters.eq_offset(radius-0.01, theta, neg, pivoted)
-        return abs(val) > np.pi, val < 0
+        return abs(val) > np.pi, val > 0
 
     def _get_base_bool(self, radius, theta, parameters, neg, pivoted = None):
         try: 
             val = parameters.eq_base(radius+0.01, theta, neg)
         except OutOfUnitaryBound:
             val = parameters.eq_base(radius-0.01, theta, neg)
-        return abs(val) > np.pi, val < 0
+        return abs(val) > np.pi, val > 0
 

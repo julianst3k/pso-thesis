@@ -207,7 +207,7 @@ class NewtonRaphson:
         solved_r = False
         solved_l = False
         tol = 1e-4
-        if xr - xl < 0.01:
+        if xl - xr < 0.01:
             return False, False
         while keep_xr or keep_xl:
             if keep_xr:

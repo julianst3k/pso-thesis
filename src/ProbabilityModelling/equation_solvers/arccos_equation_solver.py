@@ -15,8 +15,6 @@ class ArccosEquationSolver:
         costh = np.cos(theta)
         if theta >= np.pi/2 and theta <= 3/2*np.pi:
             pivot = -d/np.cos(theta)
-            if theta > 2.86 and theta < 2.87:
-                print(pivot, theta)
             for lim in lims:
                 if lim.high < pivot:
                     continue
@@ -52,8 +50,6 @@ class ArccosEquationSolver:
                 L1ap, L2ap, flagu = self._solve_quadratic_offset(a, b, c, theta, parameters, True, pivot_point= pivot, lmin = pivot)
                 if flagu == 0:
                     L1ap, L2ap = oldL1, oldL2
-            if theta > 2.86 and theta < 2.87:
-                print(L1ap, L2ap, flagu, "hi")
 
             if flagu is None:
                 pivot = None
@@ -68,7 +64,7 @@ class ArccosEquationSolver:
         b = 2*parameters.sinbeta*costh*parameters.a
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
         c = parameters.b**2*parameters.cosfov**2-parameters.a**2
-        sol1, sol2 = self._solve_quadratic_base(a,b,c,theta,parameters, Lmin)
+        sol1, sol2 = self._solve_quadratic_base(a,b,c,theta,parameters, Lmin)        
         output = interval_solver.base_intervals_solver(sol1, sol2, theta, parameters)
         if parameters.cosfov*np.sqrt(parameters.b**2)-parameters.a > 0:
             x_switch = np.sqrt(parameters.cosfov**2*parameters.b**4/parameters.a**2-parameters.b**2)
@@ -140,8 +136,8 @@ class ArccosEquationSolver:
                 i += 1
         L1, L2 = sols[0], sols[1]
         if L1 is None or L1 < 0:
-            ub = parameters.eq_base(lmin, theta)
-            lb = parameters.eq_base(lmin, theta,neg=-1)
+            ub = parameters.eq_base(lmin+0.001, theta)
+            lb = parameters.eq_base(lmin+0.001, theta,neg=-1)
             """
                 As we saw before, it can only be below np.pi!
             """
@@ -214,8 +210,6 @@ class ArccosEquationSolver:
         L2_is_lb = False
         L1_is_lb = False
         L1_is_ub = False
-        if theta > 2.86 and theta < 2.87:
-            print(L1, L2)
 
         if L1 < (lmin if not pivot else pivot_point):
             """
@@ -249,8 +243,6 @@ class ArccosEquationSolver:
         
         sol_is_lb = L1_is_lb or L2_is_lb
         sol = L1 if L1 is not None else L2
-        if theta > 2.86 and theta < 2.87:
-            print(L1, L2, "passed")
 
         if L1 is not None and L2 is not None:
             return SolWrapper(L1, L1_is_lb, L1_is_ub), SolWrapper(L2, L2_is_lb, L2_is_ub), 3

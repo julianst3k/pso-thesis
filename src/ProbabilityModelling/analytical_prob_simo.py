@@ -38,7 +38,6 @@ class AnalyticalSIMO(AnalyticalProbability):
                 integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, True)
             else:
                  integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, False)
-        print(integral)
         return integral
 
 if __name__ == "__main__":

@@ -226,7 +226,6 @@ class PairTreeGenerator:
                 res_lb = self.pair_solver._lb_min_finder(self.constant_interval, self.pairs)
                 intervals_merged = self.int_gen.interval_finder_merger(res_ub, res_lb)
                 res_intervs = self.pair_solver._check_centers_list(intervals_merged)
-
                
         else:
             """
@@ -352,8 +351,10 @@ class PairSolver:
         False, Interval, breaking point: To create the new intervals from br to high
         Interval, False, breaking point: To create the new intervals from low to br
         """
-        func = lambda x, *args: interv_top.gen_func(self.parameters)(x, interv_top, self.theta, interv_top.offset_lb if reverse else interv_top.offset_ub) - interv_bottom.gen_func(self.parameters)(x, interv_bottom, self.theta, interv_bottom.offset_ub if reverse else interv_bottom.offset_lb)
-        dfunc = lambda x, *args: interv_top.gen_dfunc(self.parameters)(x, interv_top, self.theta) - interv_bottom.gen_dfunc(self.parameters)(x, interv_bottom, self.theta)
+        f_top, f_low = interv_top.gen_func(self.parameters), interv_bottom.gen_func(self.parameters)
+        df_top, df_low = interv_top.gen_dfunc(self.parameters), interv_bottom.gen_dfunc(self.parameters)
+        func = lambda x, *args: f_top(x, interv_top, self.theta, interv_top.offset_lb if reverse else interv_top.offset_ub) - f_low(x, interv_bottom, self.theta, interv_bottom.offset_ub if reverse else interv_bottom.offset_lb)
+        dfunc = lambda x, *args: df_top(x, interv_top, self.theta) - df_low(x, interv_bottom, self.theta)
         newton = NewtonRaphson(low, high, func, dfunc, self.parameters)
         base_min = interv_bottom
         offset_min = interv_top
@@ -390,6 +391,7 @@ class PairSolver:
                 return [interv_bottom, interv_top]
         else:
             sol = s1 if s1 else s2 
+
             if not sol:
                 if func_val >= 0:
                     return [interv_bottom, interv_top]
@@ -462,15 +464,16 @@ class PairSolver:
         min_intervs_one, min_intervs_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base_max, 
         offset_max)
         higher_set = self._breaking_point_insertion(min_intervs_one, min_intervs_two, breaking_point, base_max, offset_max)
-        unf_res_intervs = [self._check_max_min(max(maxi.lb, lower_bound.lb), min(maxi.ub, lower_bound.ub), lower_bound.push_functional_interval(True), maxi) for maxi in higher_set]
+        unf_res_intervs = [self._check_max_min(max(maxi.lb, lower_bound.lb), min(maxi.ub, lower_bound.ub), lower_bound.push_functional_interval(True).set_lb_ub(max(maxi.lb, lower_bound.lb), min(maxi.ub, lower_bound.ub)), maxi) for maxi in higher_set]
         res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
+
         return res_intervs
     def _ub_max_finder(self, upper_bound, pair):
         base_min = pair[0].push_functional_interval(True)
         offset_min = pair[1].push_functional_interval(True)
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
         lower_set = self._breaking_point_insertion(max_interval_one, max_interval_two, breaking_point, base_min, offset_min)
-        unf_res_intervs = [self._check_max_min(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub), mini, upper_bound.push_functional_interval(False)) for mini in lower_set]
+        unf_res_intervs = [self._check_max_min(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub), mini, upper_bound.push_functional_interval(False).set_lb_ub(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub))) for mini in lower_set]
         res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
         return res_intervs
     def _check_centers_list(self, interval_list):
@@ -575,7 +578,7 @@ class PairIntervalGenerator:
                 else:
                     output_array.append([lb_interv[0],lb_interv[1], None, None])
                     j+=1
-                    cap = j < len(res_lb)
+                    not_capped = j < len(res_lb)
                 if ub_interv[0].ub < lb_interv[0].ub:
                     lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])
@@ -585,7 +588,7 @@ class PairIntervalGenerator:
                     lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
                     j+=1 
-                    cap = j < len(res_lb)
+                    not_capped = j < len(res_lb)
                     
             elif ub_interv[0].lb < lb_interv[0].lb:
                 if lb_interv[0].lb < ub_interv[0].ub:
@@ -598,7 +601,7 @@ class PairIntervalGenerator:
                     lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_lb_paired, upper_lb_paired])
                     j+=1
-                    cap = j < len(res_lb)
+                    not_capped = j < len(res_lb)
                 else:
                     lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired, upper_lb_paired, ub_interv[0], ub_interv[1]])
@@ -608,7 +611,7 @@ class PairIntervalGenerator:
                     lower_ub_paired, upper_ub_paired = self.inverse_divide_pair_wrapper(lb_interv[0].ub, ub_interv)
                     output_array.append([lb_interv[0],lb_interv[1], lower_ub_paired, upper_ub_paired])
                     j+=1
-                    cap = j < len(res_lb)
+                    not_capped = j < len(res_lb)
                 else:
                     lower_lb_paired, upper_lb_paired = self.inverse_divide_pair_wrapper(ub_interv[0].ub, lb_interv)
                     output_array.append([lower_lb_paired,upper_lb_paired, ub_interv[0], ub_interv[1]])

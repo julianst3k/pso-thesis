@@ -27,9 +27,6 @@ class AnalyticalMISO(AnalyticalProbability):
                     for sol in output[triangle]:
                         if sol.lb == sol.ub:
                             output[triangle].remove(sol)
-                    if triangle.avg_ang > 3.13 and triangle.avg_ang < 3.14:
-                        for sol in output[triangle]:
-                            print(sol)
 
             return output
         return _modulus_wrapper    
@@ -67,9 +64,7 @@ class AnalyticalMISO(AnalyticalProbability):
         else:
             self.base_offset_pairs = {}
             for triangle in self.rect:
-                if triangle.avg_ang > 2.87 and triangle.avg_ang < 2.89:
-                    for sol in self.sol_offset_equations[triangle]:
-                        print(sol)
+
                 self.base_offset_pairs[triangle] = self.interval_pairing(self.sol_base_equations[triangle], self.sol_offset_equations[triangle], debug = debug)
     @_modulus_solver
     def _solve_base_wrapper(self, theta = None):
@@ -106,6 +101,18 @@ class AnalyticalMISO(AnalyticalProbability):
     def eq_offset_int(self, L, interval, theta, offset):
         sign = (-1)**(interval.is_neg)
         return self.eq_offset(L, theta, sign, interval.pivoted, offset, interval.ub_over_pi)
+    def eq_offset_int_debug(self, L, interval, theta, offset):
+        sign = (-1)**(interval.is_neg)
+        return self.eq_offset_debug(L, theta, sign, interval.pivoted, offset, interval.ub_over_pi)
+
+    def eq_offset_debug(self, L, theta, neg=1, pivot = False, is_offset = False, negative_mod = False):
+        epsilon = 0.01 # Relevant to avoid floating problems
+        acos_arg = (self.cosfov*np.sqrt(L**2+2*d*L*np.cos(theta)+d**2+self.b**2)-self.a)/(np.sqrt(L**2+d**2+2*d*L*np.cos(theta))*self.sinbeta)
+        if acos_arg > 1+epsilon:
+            raise OutOfUnitaryBound
+        off = np.arctan(L*np.sin(theta)/(L*np.cos(theta)+d))+pivot*np.pi
+        acos_arg = max(min(1, acos_arg),-1)
+        return 2*np.pi*is_offset*(-1)**negative_mod + neg*np.arccos(acos_arg)-off, acos_arg, off 
 
 
 
@@ -161,7 +168,7 @@ class AnalyticalMISO(AnalyticalProbability):
         
         offset_u = np.sqrt(u**2+self.d**2+2*self.d*u*np.cos(theta))
         offset_derivative_arccos = self.base_derivative(offset_u)*(u+self.d*np.cos(theta))/offset_u
-        offset_derivative_tan = -1/(offset_u**2)*(self.d*np.sin(theta))
+        offset_derivative_tan = 1/(offset_u**2)*(self.d*np.sin(theta))
         return offset_derivative_arccos - offset_derivative_tan
 
     def interval_diff_d(self, u, theta, base_interval, offset_interval, is_lb = False):
@@ -182,19 +189,18 @@ class AnalyticalMISO(AnalyticalProbability):
         integral = 0
         pairs_dict = {}
         for triangle in self.rect:
-            #for pair in self.base_offset_pairs[triangle]:
             #    print(pair[0])
             #    print(pair[1])
-            print(triangle.avg_ang)
-            if triangle.avg_ang > 3.13 and triangle.avg_ang < 3.14:
-                for pair in self.base_offset_pairs[triangle]:
+            #print(triangle.avg_ang)
+            if triangle.avg_ang > 5.17 and triangle.avg_ang < 5.18:
+                pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
+                pairs_dict[triangle] = pairs
+
+                for pair in pairs_dict[triangle]:
                     print(pair[0])
-                    print(pair[1], pair[1].pivoted)
-            pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
-            pairs_dict[triangle] = pairs
-            #for pair in pairs_dict[triangle]:
-            #    print(pair[0])
-            #    print(pair[1])
+                    print(pair[1])
+
+                
         integral = integrator(pairs_dict, self)
         return integral
 

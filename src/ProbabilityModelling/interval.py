@@ -59,9 +59,13 @@ class FunctionalInterval(Interval):
         if self.is_offset:
             return params.eq_offset_int
         elif self.pi_interval:
-            return lambda x, *args: (-1)**(not self.is_neg)*np.pi
+            return lambda x, *args: (-1)**(self.is_neg)*np.pi
         else:
             return params.eq_base_int
+    def set_lb_ub(self, lb, ub):
+        self.lb = lb 
+        self.ub = ub
+        return self
     def gen_dfunc(self, params):
         if self.is_offset:
             return params.offset_derivative_int
@@ -81,17 +85,36 @@ class FunctionalInterval(Interval):
         return self._integrate(triang, parameters, self.offset_lb, False, True)
     def integrate_ub(self, triang, parameters):
         return self._integrate(triang, parameters, self.offset_ub, self.ub_over_pi, False)
+    def riemman_integral(self, triang, params):
+        angs = np.linspace(triang.ang_low, triang.ang_high, 100)
+        radius = np.linspace(self.lb, self.ub, 100)
+        diff_ang = angs[1]-angs[0]
+        diff_rad = radius[1]-radius[0]
+        summ_tot = 0
+        summ_arc = 0
+        summ_atan = 0
+        for r in radius:
+            for ang in angs:
+                func = params.eq_offset_int_debug
+                func_ret = func(r, self, ang, self.offset_lb if self.is_neg else self.offset_ub)
+                summ_tot += diff_ang*diff_rad*func_ret[0]*r
+                summ_arc += diff_ang*diff_rad*func_ret[1]*r
+                summ_atan += diff_ang*diff_rad*func_ret[2]*r
+        return summ_tot, summ_arc, summ_atan
+
     def _integrate(self, triang, parameters, offset, over_pi, is_lb):
         if self.is_offset:
             integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
             acos_integral = integrator.acos_integrator(triang)
             atan_integral = integrator.atan_integral(triang)
             pi_const_integral = integrator.pi_const_integrator(triang)
+            print("Atan",atan_integral+(self.pivoted)*pi_const_integral)
+            print("Acos",acos_integral)
             if offset:
                 if over_pi:
-                    return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral-2*pi_const_integral
+                    return (-1)**(is_lb)*acos_integral-atan_integral-2*pi_const_integral-(self.pivoted)*pi_const_integral
                 else:
-                    return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral+2*pi_const_integral
+                    return (-1)**(is_lb)*acos_integral-atan_integral+2*pi_const_integral-(self.pivoted)*pi_const_integral
             return (-1)**(is_lb)*acos_integral-atan_integral-(self.pivoted)*pi_const_integral
         if self.pi_interval:
             integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
