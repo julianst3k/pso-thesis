@@ -108,8 +108,6 @@ class FunctionalInterval(Interval):
             acos_integral = integrator.acos_integrator(triang)
             atan_integral = integrator.atan_integral(triang)
             pi_const_integral = integrator.pi_const_integrator(triang)
-            print("Atan",atan_integral+(self.pivoted)*pi_const_integral)
-            print("Acos",acos_integral)
             if offset:
                 if over_pi:
                     return (-1)**(is_lb)*acos_integral-atan_integral-2*pi_const_integral-(self.pivoted)*pi_const_integral

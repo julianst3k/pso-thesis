@@ -1,6 +1,7 @@
 import numpy as np 
 import scipy as sp 
 from aux import UniformRectangle
+from montecarlo_prob import MonteCarloIntegrator
 def cotan(x):
     return np.cos(x)/np.sin(x)
 
@@ -45,6 +46,7 @@ class MISOOffsetIntegrator:
         avg_t = triang.avg_ang
         tb, tt = triang.ang_low, triang.ang_high
         x_u, x_d = self.solve_b_u_threshold(avg_t, d, b)
+        ua = lambda x, t: np.sqrt(x**2+d**2+2*d*x*np.cos(t))
         """
         Se genera un intervalo entre x_u y x_d, el cual se intersecta con [xb, xt]
         """
@@ -53,6 +55,9 @@ class MISOOffsetIntegrator:
             integr += lambda_over_one_wrap(xt, xb, tt, tb)            
             integr += lambda_over_two_wrap(xt, xb, tt, tb)
         elif xt < x_u and xb >= x_d: # Hay full interseccion, como es creciente entonces estamos por bajo b
+            minimum = -d*np.cos(avg_t)/2
+            delta = b*(1+1/2*ua(minimum,avg_t)**2/b**2)-np.sqrt(ua(minimum,avg_t)**2+b**2)
+            integr -= delta/2*(xt**2-xb**2)*(tt-tb)
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
             integr += lambda_under_two_wrap(xt, xb, tt, tb)
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
@@ -65,7 +70,6 @@ class MISOOffsetIntegrator:
             integr += lambda_over_two_wrap(xt, x_d, tt, tb)
             integr += lambda_under_one_wrap(x_d, xb, tt, tb)
             integr += lambda_under_two_wrap(x_d, xb, tt, tb)
-        #print(integr)
         lambda_one_a_constant, _ = self.acos_lambda_under_b(use_discerner=False)
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
@@ -136,6 +140,19 @@ class MISOOffsetIntegrator:
                 ## 1/(L+dcos(x)) -> log|L+dcos(x)|
                 ## Si L+dcos(x) < 0 -> log(-L-dcos(x)) => No me conviene pq no puedo factorizar para afuera
                 ## Solucion: Dividir por -dcos(x) (El cual es negativo)
+                #
+                ## Usar esto mejor...
+                logd_term = np.sin(t)**3/3*np.log(d)
+                eta = x/d
+                sinusoidal_terms = np.sin(t)**3/3*np.log(eta+np.cos(t))+1/3*(-np.sin(t)**3/3-eta*np.sin(2*t)/4+(eta**2-1)*np.sin(t))
+                linear_terms = 1/3*(-eta*(eta**2-1)*t+eta/2*t)
+                if eta**2 > 1:
+                    tanh_term = 2*(eta**2-1)**(3/2)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
+                else:
+                    u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
+                    tanh_term = -2*(1-eta**2)**(3/2)*np.arctanh(u) if np.abs(u) <= 1 else -2*(1-eta**2)**(3/2)*np.arctanh(1/u) 
+                return logd_term + sinusoidal_terms + linear_terms + tanh_term/3
+                """
                 if x+d*np.cos(t) < 0:
                     u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                     base = 0
@@ -143,27 +160,38 @@ class MISOOffsetIntegrator:
                     summ = 0
                     for n in range(1,N):
                         summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
+                    print(f"Summ with {t} in Approx x < dcos: {summ}")
                     return summ + base
+                    
                 else:
                     if x == 0: 
                         # En este caso, log(x) = 0, y d/x = inf,
                         # Sin embargo, la solucion real es log(dcos(x)) => usar simplemente el caso base de arriba
                         u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                         base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))+(np.log(u)-np.sin(t)-np.sin(t)**3/3)) 
-                        return base 
-                    if x > d*np.cos(t):
+                        return base
+                    if np.abs(d*np.cos(t)/x-1) < 0.1:
+                        ## En este caso las aproximaciones que hay debajo dan mucho error
+                        base = 0
+                        first_term = ((x-1)*np.sin(t)**3/3+d/8*t-np.sin(4*t)/32*d)
+                        second_term = -((x-1)**2*np.sin(t)**3/3+2*(x-1)*(d/8*t-np.sin(4*t)/32*d)+d**2*(self.f_cos(t, 4)-self.f_cos(t, 8)))/2  
+                        summ = first_term + second_term
+                        print(f"Summ with {t} in Approx around 1: {summ}")
+                    elif x > d*np.cos(t):
+
                         base = np.sin(t)**3/3*np.log(x)
                         summ = 0
                         for n in range(1,N):
                             summ += (d/x)**n*(-1)**(n)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
+                        print(f"Summ with {t} in Approx x>dcos: {summ}")
                     else:
                         u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
                         base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
                         summ = 0
                         for n in range(1,N):
                             summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
-
                 return summ + base
+                """
 
             aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t))
             if x >= -d*np.cos(tt): # x+dcos(t) > 0
@@ -190,7 +218,7 @@ class MISOOffsetIntegrator:
             return summ
         
         lambda_upper = lambda x, tt, tb: lambda_upper_aux(x, tt, tb, d) 
-        lambda_lower_aux = lambda x, t: (-1)**(t<np.pi)*(-x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.abs(np.tan(t/2)))+d*x**3/3*np.log(np.abs(np.sin(t)))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.abs(np.tan(t/2)))))
+        lambda_lower_aux = lambda x, t: (-1)**(t>np.pi)*(-x**2/2*d*np.cos(t)+x**4/(8*d)*np.log(np.abs(np.tan(t/2)))+d*x**3/3*np.log(np.abs(np.sin(t)))+x**2*d**2/(4*d)*(np.cos(t)+np.log(np.abs(np.tan(t/2)))))
         lambda_lower = lambda x, tt, tb: lambda_lower_aux(x,tt) - lambda_lower_aux(x,tb)
         return lambda_upper, lambda_lower
     def x_dcos_ineq_integral(self, xt, xb, tt, tb, d):
@@ -347,13 +375,14 @@ class MISOOffsetIntegrator:
         """
         Tested = Necesito mas ejemplos pero por ahora esta bien
         """
-        lambda_list = self.atan_lambdas(triang)
+        lambda_list, alternate = self.atan_lambdas(triang)
         xt = self.ub
         xb = self.lb
         tt = triang.ang_high
         tb = triang.ang_low            
         summ = 0
         d = self.params.d
+        avg = triang.avg_ang
         subsum = np.zeros(3)
         for i, lamb in enumerate(lambda_list):
             presum = summ
@@ -364,8 +393,12 @@ class MISOOffsetIntegrator:
                     summ -= lamb(xb, tt)-lamb(xb,tb)
                 subsum[2] += lamb(xt, tt)-lamb(xt,tb) if np.abs(xt-d) >= 0.1 else 0
             else:
-                summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
-
+                if i == 1 and (xt + d*np.cos(avg) == 0 or xb + d*np.cos(avg) == 0):
+                    summ += alternate[i](xt,xb,tt)-alternate[i](xt,xb,tb)
+                elif i == 0 and (d + xt*np.cos(avg) == 0 or d + xb*np.cos(avg) == 0):
+                    summ += alternate[i](xt,xb,tt)-alternate[i](xt,xb,tb)
+                else:
+                    summ += lamb(xt, tt)-lamb(xt,tb)-lamb(xb, tt)+lamb(xb, tb)
                 if i < 2:
                     subsum[0] += lamb(xb, tt)-lamb(xb,tb)
                     
@@ -381,7 +414,7 @@ class MISOOffsetIntegrator:
         Tested: Si
         """
         def approx_val(x, d, tb):
-            approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))
+            approx_val = np.arctan(d*np.sin(tb)/(x+d*np.cos(tb)))            
             return approx_val
         def approx_der(x, d, tb):
             approx_der = 1/(x**2+2*d*x*np.cos(tb)+d**2)*(x*d*np.cos(tb)+d**2)
@@ -393,15 +426,37 @@ class MISOOffsetIntegrator:
             log_x_d = -(np.log((x**2+d**2))-1+np.log(2))*np.cos(2*t)/4
             expansion = -sum([((2*x*d)/(x**2+d**2))**n*(-1)**(n-1)*np.cos(t)**(n+2)/(n*(n+2)) for n in range(1,15)])
             return (log_x_d+expansion)*multiplier
-
+        def radial_lambda(xt, xb, d, t):
+            approx_val_t = approx_val(d,xt,avg)
+            approx_val_b = approx_val(d,xb,avg)
+            if d+xt*np.cos(avg) == 0 and approx_val_t/approx_val_b < 0:
+                approx_val_t *= -1
+            if d+xb*np.cos(avg) == 0 and approx_val_t/approx_val_b < 0:
+                approx_val_b *= -1
+            sum_one = (xt**2/2)*(approx_val_t)*t+(xt**2/2)*approx_der(d,xt,avg)*(t**2/2-avg*t)
+            sum_two = (xb**2/2)*(approx_val_b)*t+(xb**2/2)*approx_der(d,x,avg)*(t**2/2-avg*t)
+            return sum_one - sum_two
+        def angular_lambda(xt, xb, d, t):
+            approx_val_t = approx_val(xt, d, avg)
+            approx_val_b = approx_val(xb, d, avg)
+            if xt+d*np.cos(avg) == 0 and approx_val_t/approx_val_b < 0:
+                approx_val_t *= -1
+            if xb+d*np.cos(avg) == 0 and approx_val_t/approx_val_b < 0:
+                approx_val_b *= -1
+            sum_one =  (d**2/2*(np.sin(2*t)/2*(approx_val_t-approx_der(xt,d,avg)*avg)+approx_der(xt,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
+            sum_two =  (d**2/2*(np.sin(2*t)/2*(approx_val_b-approx_der(xb,d,avg)*avg)+approx_der(xb,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4)))
+            return sum_one - sum_two
         d = self.params.d
         avg = triang.avg_ang
         lambda_list = []
+        alternative_list = []
         lambda_list.append(lambda x, t: (x**2/2)*(approx_val(d,x,avg))*t+(x**2/2)*approx_der(d,x,avg)*(t**2/2-avg*t))
         lambda_list.append(lambda x, t: (d**2/2*(np.sin(2*t)/2*(approx_val(x,d,avg)-approx_der(x,d,avg)*avg)+approx_der(x,d,avg)*(t*np.sin(2*t)/2+np.cos(2*t)/4))))
         lambda_list.append(lambda x, t: 1/2*d*np.cos(t)*x)
         lambda_list.append(lambda x, t: fourth_lambda(x, d, t))
-        return lambda_list
+        alternative_list.append(lambda xt, xb, t: radial_lambda(xt,xb,d,t))
+        alternative_list.append(lambda xt, xb, t: angular_lambda(xt,xb,d,t))
+        return lambda_list, alternative_list
 class MISOBaseIntegrator:
     def __init__(self, lb, ub, consts, parameters):
         self.lb = lb
@@ -823,6 +878,7 @@ class TriangleIntegrator:
         X, Y = self.rect.X, self.rect.Y
         area = 0
         tot_int = 0
+        mont_sum = 0
         print("Start Integrating...")
         for triang in list_of_lims:
             lims = list_of_lims[triang]
@@ -832,9 +888,12 @@ class TriangleIntegrator:
                 integral = self.integral_wrapper(lim, triang, parameters)
                 triang_subtot += integral
                 tot_int += integral
-                if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
-                    print(triang_subtot)
+            integrator = MonteCarloIntegrator()
+            mont = integrator.miso_integrator(10000,triang.max_r, triang.ang_low, triang.ang_high)
+            mont_sum += mont*triang.get_area()
+            print(triang_subtot/triang.get_area(), mont, triang.avg_ang, triang.max_r)
             area += triang.get_area()
+        print(mont_sum/area)
         return tot_int/area
     def __call__(self, list_of_lims, parameters):
         return self.wrapper_integrator(list_of_lims, parameters)

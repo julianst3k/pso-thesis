@@ -192,13 +192,10 @@ class AnalyticalMISO(AnalyticalProbability):
             #    print(pair[0])
             #    print(pair[1])
             #print(triangle.avg_ang)
-            if triangle.avg_ang > 5.17 and triangle.avg_ang < 5.18:
-                pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
-                pairs_dict[triangle] = pairs
+            pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
+            pairs_dict[triangle] = pairs
+                
 
-                for pair in pairs_dict[triangle]:
-                    print(pair[0])
-                    print(pair[1])
 
                 
         integral = integrator(pairs_dict, self)
