@@ -169,6 +169,8 @@ class PairTreeGenerator:
                     LB Offset           LB No Offset
                 UB Offset UB No Offset  UB No Offset -> Since LB < UB, UB will never have offset without LB   
         """
+        if self.pairs[0].consts == 1 or self.pairs[1].consts == 1:
+            return self.unitary_const_pairing()
         if self.pairs[0].offset_lb:
             if self.pairs[0].offset_ub: 
                 return self._lb_ub_offset_node()
@@ -176,7 +178,39 @@ class PairTreeGenerator:
                 return self._lb_offset_node()
         else:
             return self._no_offset_node()
+    def unitary_const_pairing(self):
+        push = lambda x: x.push_functional_interval(True)
+        if self.pairs[0].consts == 1:
+            if self.pairs[1].consts == 1:
+                return [list(map(push, [self.pairs[0],self.pairs[0]]))]
+            else:
+                if self.pairs[1].offset_lb and not self.pairs[1].offset_ub:
+                    neg = self.constant_interval.push_functional_interval(True)
+                    pos = self.constant_interval.push_functional_interval(True)
+                    neg.lb = self.pairs[1].lb
+                    neg.ub = self.pairs[1].ub
+                    pos.lb = self.pairs[1].lb
+                    pos.ub = self.pairs[1].ub
+                    ub_arr = list(map(push, [self.pairs[1], pos]))
+                    lb_arr = list(map(push, [neg, self.pairs[1]]))
 
+                    return [lb_arr, ub_arr]
+
+                else:
+                    return [list(map(push, [self.pairs[1],self.pairs[1]]))]
+        else:
+            if self.pairs[0].offset_lb and not self.pairs[0].offset_ub:
+                neg = self.constant_interval.push_functional_interval(True)
+                pos = self.constant_interval.push_functional_interval(True)
+                neg.lb = self.pairs[1].lb
+                neg.ub = self.pairs[1].ub
+                pos.lb = self.pairs[1].lb
+                pos.ub = self.pairs[1].ub
+                ub_arr = list(map(push, [self.pairs[0], pos]))
+                lb_arr = list(map(push, [neg, self.pairs[0]]))
+                return [lb_arr, ub_arr]
+            else:
+                return [list(map(push, [self.pairs[0],self.pairs[0]]))]
  
 
     def _lb_ub_offset_node(self):
@@ -192,6 +226,7 @@ class PairTreeGenerator:
                   [lb*, min(ub*, ubd)] + [max(lb, lbd), ub*]
                         _lb_min              _ub_max
                 """
+
                 res_ub = self.pair_solver._ub_max_finder(self.pairs.get_interval(), self.pairs)
                 res_lb = self.pair_solver._lb_min_finder(self.pairs.get_interval(), self.pairs)
                 intervals_merged = self.int_gen.interval_finder_merger(res_ub, res_lb)
@@ -351,6 +386,9 @@ class PairSolver:
         False, Interval, breaking point: To create the new intervals from br to high
         Interval, False, breaking point: To create the new intervals from low to br
         """
+        if np.abs(low-high) < 0.00001:
+            ## It doesnt matter lol
+            return [interv_bottom, interv_top]
         f_top, f_low = interv_top.gen_func(self.parameters), interv_bottom.gen_func(self.parameters)
         df_top, df_low = interv_top.gen_dfunc(self.parameters), interv_bottom.gen_dfunc(self.parameters)
         func = lambda x, *args: f_top(x, interv_top, self.theta, interv_top.offset_lb if reverse else interv_top.offset_ub) - f_low(x, interv_bottom, self.theta, interv_bottom.offset_ub if reverse else interv_bottom.offset_lb)
@@ -360,23 +398,24 @@ class PairSolver:
         offset_min = interv_top
         max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base_min, offset_min)
         s1, s2 = newton.solve(self.theta, interv_bottom, interv_top)
-        func_val = func(low+0.001)
+        func_val = func(low+0.00001)
+        higher_set = []
         if s1 and s2:
             """
             Two solutions
             """
-            if max_interval_one == base_min:
-                new_one = base_min.divide_interval(s1)
-                offset_min.ub = s2
-                new_one.lb = s2
-                offset_min.lb = s1
-                higher_set.append(offset_min, new_one)
-            if max_interval_one == offset_min:
-                new_one = max_interval_one.divide_interval(s1)
-                base_min.ub = s2
-                new_one.lb = s2
-                base_min.lb = s1
-                higher_set.append(base_min, new_one)
+            #if max_interval_one == base_min:
+            #    new_one = base_min.divide_interval(s1)
+            #    offset_min.ub = s2
+            #    new_one.lb = s2
+            #    offset_min.lb = s1
+            #    higher_set.append(offset_min, new_one)
+            #if max_interval_one == offset_min:
+            #    new_one = max_interval_one.divide_interval(s1)
+            #    base_min.ub = s2
+            #    new_one.lb = s2
+            #    base_min.lb = s1
+            #    higher_set.append(base_min, new_one)
             if func_val >= 0:
                 last_interv_top = interv_top.divide_interval(s1)
                 last_interv_bot = interv_top.divide_interval(s1)
@@ -386,7 +425,7 @@ class PairSolver:
             else:
                 interv_top.lb = s1
                 interv_bot.lb = s1
-                interv_top.ub = s2
+                interv_bot.ub = s2
                 interv_top.ub = s2
                 return [interv_bottom, interv_top]
         else:
@@ -406,6 +445,7 @@ class PairSolver:
                     interv_bottom.ub = sol
                     interv_top.ub = sol
                     return [interv_bottom, interv_top]
+        return higher_set
     def _min_max_finder(self, pair):
         """
         We need to get the maximum and minimum for the intersection. Min Max finder

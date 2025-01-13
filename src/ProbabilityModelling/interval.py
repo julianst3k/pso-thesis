@@ -87,7 +87,7 @@ class FunctionalInterval(Interval):
         return self._integrate(triang, parameters, self.offset_ub, self.ub_over_pi, False)
     def riemman_integral(self, triang, params):
         angs = np.linspace(triang.ang_low, triang.ang_high, 100)
-        radius = np.linspace(self.lb, self.ub, 100)
+        radius = np.linspace(self.lb, min(self.ub, triang.max_r), 100)
         diff_ang = angs[1]-angs[0]
         diff_rad = radius[1]-radius[0]
         summ_tot = 0
@@ -101,12 +101,15 @@ class FunctionalInterval(Interval):
                 summ_arc += diff_ang*diff_rad*func_ret[1]*r
                 summ_atan += diff_ang*diff_rad*func_ret[2]*r
         return summ_tot, summ_arc, summ_atan
-
     def _integrate(self, triang, parameters, offset, over_pi, is_lb):
         if self.is_offset:
             integrator = MISOOffsetIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+            if self.consts == 1:
+                pi_const_integral = integrator.pi_const_integrator(triang)
+                return (-1)**(is_lb)*pi_const_integral
             acos_integral = integrator.acos_integrator(triang)
             atan_integral = integrator.atan_integral(triang)
+            #print(acos_integral, atan_integral, self.riemman_integral(triang, parameters), self.lb, self.ub, triang.ang_high, triang.ang_low)
             pi_const_integral = integrator.pi_const_integrator(triang)
             if offset:
                 if over_pi:
@@ -120,6 +123,9 @@ class FunctionalInterval(Interval):
             return (-1)**(is_lb)*pi_const_integral            
         else:
             integrator = MISOBaseIntegrator(self.lb, min(self.ub, triang.max_r), self.consts, parameters)
+            if self.consts == 1:
+                pi_const_integral = integrator.pi_const_integrator(triang)
+                return (-1)**(is_lb)*pi_const_integral
             acos_integral = integrator.acos_integrator(triang)
             angle_integral = -integrator.angle_integrator(triang)
             if offset:

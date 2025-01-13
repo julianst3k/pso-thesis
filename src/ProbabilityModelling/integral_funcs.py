@@ -135,7 +135,7 @@ class MISOOffsetIntegrator:
         """
         def lambda_upper_aux(x, tt, tb, d):
             ## Tested, I think..
-            def cos_expansion(x, d, t, N = 10):
+            def cos_expansion(x, d, t, set_sign = 1, N = 10):
                 ## Integral of d^2sin^2dcos(x)/(L+dcos(x)) // :)
                 ## 1/(L+dcos(x)) -> log|L+dcos(x)|
                 ## Si L+dcos(x) < 0 -> log(-L-dcos(x)) => No me conviene pq no puedo factorizar para afuera
@@ -144,13 +144,16 @@ class MISOOffsetIntegrator:
                 ## Usar esto mejor...
                 logd_term = np.sin(t)**3/3*np.log(d)
                 eta = x/d
-                sinusoidal_terms = np.sin(t)**3/3*np.log(eta+np.cos(t))+1/3*(-np.sin(t)**3/3-eta*np.sin(2*t)/4+(eta**2-1)*np.sin(t))
+
+                sinusoidal_terms = np.sin(t)**3/3*np.log(np.abs(eta+np.cos(t)))+1/3*(-np.sin(t)**3/3-eta*np.sin(2*t)/4+(eta**2-1)*np.sin(t))
                 linear_terms = 1/3*(-eta*(eta**2-1)*t+eta/2*t)
                 if eta**2 > 1:
                     tanh_term = 2*(eta**2-1)**(3/2)*np.arctan((eta-1)/np.sqrt(eta**2-1)*np.tan(t/2))    
                 else:
                     u = (eta-1)/np.sqrt(1-eta**2)*np.tan(t/2)
                     tanh_term = -2*(1-eta**2)**(3/2)*np.arctanh(u) if np.abs(u) <= 1 else -2*(1-eta**2)**(3/2)*np.arctanh(1/u) 
+                if set_sign == -1 and np.abs(t-np.pi) < 0.001:
+                    tanh_term *= set_sign
                 return logd_term + sinusoidal_terms + linear_terms + tanh_term/3
                 """
                 if x+d*np.cos(t) < 0:
@@ -192,8 +195,13 @@ class MISOOffsetIntegrator:
                             summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
                 return summ + base
                 """
-
-            aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t))
+            set_sign = 1
+            try:
+                if cos_expansion(x, d, tt)/cos_expansion(x, d, tb) < 0 and np.abs(cos_expansion(x, d, tt))>0.1:
+                    set_sign = -1 
+            except ZeroDivisionError:
+                pass
+            aux_lambda = lambda x, t: x**3/3*t + x**2/2*d*np.sin(t)+1/4*d**2*x*t-1/8*x*d**2*np.sin(2*t)-1/2*d**3*(cos_expansion(x, d, t, set_sign))
             if x >= -d*np.cos(tt): # x+dcos(t) > 0
             ## This hasnt been tested but lets assume it is true cuz why not
                 summ = aux_lambda(x, tt)
@@ -473,7 +481,7 @@ class MISOBaseIntegrator:
         b = self.consts["b"]
         cosfov = self.params.cosfov
         sinbeta = self.params.sinbeta
-        sum_int_a = lambda x: a*(0.5*cosfov/sinbeta*(x*np.sqrt(x**2+self.params.b**2)+self.params.b**2*np.log(np.sqrt(x**2+self.params.b**2)+x)))
+        sum_int_a = lambda x: a*(0.5*cosfov/sinbeta*(x*np.sqrt(x**2+self.params.b**2)+self.params.b**2*(np.log(np.sqrt(x**2+self.params.b**2)+x))))
         sum_int_b = lambda x: -self.params.a/sinbeta*x*a
         sum_int_c = lambda x: b*x**2/2
         return sum_int_a, sum_int_b, sum_int_c
@@ -889,11 +897,9 @@ class TriangleIntegrator:
                 triang_subtot += integral
                 tot_int += integral
             integrator = MonteCarloIntegrator()
-            mont = integrator.miso_integrator(10000,triang.max_r, triang.ang_low, triang.ang_high)
-            mont_sum += mont*triang.get_area()
-            print(triang_subtot/triang.get_area(), mont, triang.avg_ang, triang.max_r)
+#            print(triang_subtot/triang.get_area(), mont, triang.avg_ang, triang.max_r)
+            integrator = MonteCarloIntegrator()
             area += triang.get_area()
-        print(mont_sum/area)
         return tot_int/area
     def __call__(self, list_of_lims, parameters):
         return self.wrapper_integrator(list_of_lims, parameters)
@@ -909,6 +915,7 @@ class TriangleIntegrator:
         except TypeError:
             return self.integral_routine(lims_bot, lims_top,triang,parameters)
     def integral_routine(self,interv_bot,interv_top,triang,parameters):
+        #print(f"Percentage {interv_bot.ub/triang.max_r}")
         if triang.max_r < interv_bot.ub:
             interv_bot.ub = triang.max_r
             interv_top.ub = triang.max_r
@@ -917,12 +924,11 @@ class TriangleIntegrator:
         if np.abs(interv_bot.ub-interv_bot.lb) < 1e-4 or np.abs(interv_top.ub-interv_top.lb) < 1e-4:
             return 0
         integral = self._pivoted_skipper(interv_top, interv_bot, triang, parameters)
-        if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
-            print(f"Integral with {interv_bot} to {interv_top}: {integral}, Top: {interv_top.integrate_ub(triang, parameters)/(2*np.pi)}, Bot: {interv_bot.integrate_lb(triang, parameters)/(2*np.pi)}")
+        #if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
+         #   print(f"Integral with {interv_bot} to {interv_top}: {integral}, Top: {interv_top.integrate_ub(triang, parameters)/(2*np.pi)}, Bot: {interv_bot.integrate_lb(triang, parameters)/(2*np.pi)}")
             #tot, arc, atan = interv_bot.riemman_integral(triang, parameters)
             #print(f"Riemman Integral: {tot/(2*np.pi), arc, atan}")
             #print(f"Angle top: {triang.ang_high}, Angle bot: {triang.ang_low}")
-            ...
 
         return integral
 

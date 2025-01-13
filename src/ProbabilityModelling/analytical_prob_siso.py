@@ -36,8 +36,6 @@ class AnalyticalProbability(ProbabilityCalculator):
     def print_lims(self, lims = None):
         if lims is None:
             lims = self.lims
-        for lim in lims:
-            print(lim)
 
     
     def calculate_probability(self):

@@ -18,19 +18,22 @@ class ArccosEquationSolver:
             for lim in lims:
                 if lim.high < pivot:
                     continue
-                elif lim.high > pivot and lim.low < pivot:
+                elif lim.high > pivot and lim.low < pivot and lim.const != 1:
                     break
-                else:
+                elif lim.const != 1:
                     pivot = lim.low 
                     break
+                
         else:
             pivot = None
+        #for lim in lims:
+        #    print(lim)
+        #print(pivot, theta)
         a = parameters.cosfov**2-parameters.sinbeta**2*costh**2
         b = (2*d*parameters.cosfov**2+2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
         c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2+2*parameters.a*d*parameters.sinbeta
         L1ap, L2ap, flagu = None, None, None
         L1bp, L2bp, flagl = self._solve_quadratic_offset(a, b, c, theta,parameters, pivot_point = -d/np.cos(theta), lmin = Lmin)
-        
         if pivot is not None:
             b = (2*d*parameters.cosfov**2-2*parameters.sinbeta*parameters.a-2*d*parameters.sinbeta**2)*costh
             c = parameters.cosfov**2*d**2*costh**2+parameters.cosfov**2*b1**2-d**2*parameters.sinbeta**2-parameters.a**2-2*parameters.a*d*parameters.sinbeta
@@ -81,7 +84,15 @@ class ArccosEquationSolver:
         def triangle_wrapper(*args, **kwargs):
             sol_equations = {}
             for triangle in kwargs.get("triangles"):
-                lmin = kwargs.get("lims")[triangle][0].low
+                for lim in kwargs.get("lims")[triangle]:
+                    #print(lim, triangle.avg_ang)
+                    if lim.high < 0:
+                        continue
+                    if lim.high >= 0:
+                        if lim.const == 1:
+                            continue
+                        else:
+                            lmin = max(lim.low, 0)
                 theta = triangle.avg_ang
 
                 sol_equations[triangle] = func(args[0],kwargs.get("parameters"), theta, lmin, kwargs.get("lims")[triangle])
@@ -181,9 +192,10 @@ class ArccosEquationSolver:
 
             """
             try:
-                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
-                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
+                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.0001, theta, pivot = pivot)
+                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.0001, theta,neg=-1, pivot = pivot)
                 """
+            
                     As we saw before, it can only be below np.pi!
                 """
                 return lb < -np.pi, ub < -np.pi, 0
@@ -216,8 +228,8 @@ class ArccosEquationSolver:
                 As we saw before, it can only be below np.pi!
             """
             try:
-                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta, pivot = pivot)
-                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.01, theta,neg=-1, pivot = pivot)
+                ub = parameters.eq_offset(lmin if not pivot else pivot_point+0.0001, theta, pivot = pivot)
+                lb = parameters.eq_offset(lmin if not pivot else pivot_point+0.0001, theta,neg=-1, pivot = pivot)
             except OutOfUnitaryBound:
                 return None, None, None
             return lb < -np.pi, ub < -np.pi, 0
@@ -271,8 +283,8 @@ class ArccosEquationSolver:
                 """
                 return lb < -np.pi, ub < -np.pi, 0
             else:
-                ub = parameters.eq_offset(pivot_point+0.01, theta, pivot = pivot)
-                lb = parameters.eq_offset(pivot_point+0.01, theta,neg=-1, pivot = pivot)
+                ub = parameters.eq_offset(pivot_point+0.0001, theta, pivot = pivot)
+                lb = parameters.eq_offset(pivot_point+0.0001, theta,neg=-1, pivot = pivot)
                 """
                     As we saw before, it can only be below np.pi!
                 """

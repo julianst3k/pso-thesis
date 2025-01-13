@@ -4,6 +4,7 @@ from integral_funcs import TriangleIntegrator
 import numpy as np
 from analytical_prob_siso import AnalyticalProbability
 import equation_solvers as eq
+from montecarlo_prob import MonteCarloIntegrator
 
 class AnalyticalMISO(AnalyticalProbability):
     def __init__(self, X, Y, x_center, y_center, fov, beta, h, r, threshs, d):
@@ -16,7 +17,10 @@ class AnalyticalMISO(AnalyticalProbability):
     def _solve_lims_offset(self, theta=None):
         thresh_solver = eq.ThresholdSolver(self.threshs)
         self.offset_lims = thresh_solver.solve_lims_offset(self, theta)
-        
+        #for triangle in self.offset_lims:
+        #    if triangle.avg_ang > 3.86 and triangle.avg_ang < 3.87:
+         #       for lim in self.offset_lims[triangle]:
+          #          print(lim)
     def _modulus_solver(func):
         def _modulus_wrapper(self, *args, **kwargs):
             output, divider = func(self, *args, **kwargs)
@@ -27,6 +31,9 @@ class AnalyticalMISO(AnalyticalProbability):
                     for sol in output[triangle]:
                         if sol.lb == sol.ub:
                             output[triangle].remove(sol)
+                    #for lim in divider[triangle]:
+                    #    if triangle.avg_ang > 4.96 and triangle.avg_ang < 4.97:
+                    #        print(lim)
 
             return output
         return _modulus_wrapper    
@@ -130,6 +137,7 @@ class AnalyticalMISO(AnalyticalProbability):
             offset_pair = interval_pair[1]
             solver = eq.PairGenerator(theta, base_pair, offset_pair, self.interval_diff, self.interval_diff_d, self)
             solutions = solver.solve()
+        
             output.extend(solutions)
         return output 
 
@@ -192,8 +200,12 @@ class AnalyticalMISO(AnalyticalProbability):
             #    print(pair[0])
             #    print(pair[1])
             #print(triangle.avg_ang)
+            #if triangle.avg_ang > 3.15 and triangle.avg_ang < 3.16:
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
             pairs_dict[triangle] = pairs
+
+            
+
                 
 
 
@@ -215,7 +227,7 @@ class AnalyticalMISO(AnalyticalProbability):
     
 if __name__ == "__main__":
     beta = np.pi/180*45
-    fov = np.pi/180*30
+    fov = np.pi/180*60
     r = 0.05
     h = 1.2
     x_c = 1
@@ -229,8 +241,14 @@ if __name__ == "__main__":
                {"thr": 0.6, "consts": {"a":-1, "b":np.pi/2}},
                {"thr": 0.85, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
-    an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
+    #an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
-    print(an_prob.integrate())
+    fov = 45
+    for beta in range(20,80,2):
+        an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, d)
+        integrator = MonteCarloIntegrator()
+        mont = integrator.miso_integrator(10000, beta = beta, fov = fov)
+
+        print(an_prob.integrate(), mont, beta)
 
 

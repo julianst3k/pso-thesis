@@ -12,6 +12,7 @@ class ThresholdSolver:
             self.threshs = self.threshs[::-1]
             parameters.threshs = self.threshs
         filled = False
+        r = np.sqrt(parameters.X**2+parameters.Y**2)
         for thresh in self.threshs:
             u = thresh["thr"]
             a = parameters.cosfov**2-u**2*parameters.sinbeta**2
@@ -31,14 +32,17 @@ class ThresholdSolver:
                         xL2 = L2
                 else:
                     lims.append(IntegrationLimit(None, L1, thresh["consts"]))
+                    if L1 > r:
+                        filled = True
                     if L2 != None:
                         lims.append(IntegrationLimit(L2, None, thresh["consts"]))
-            if L1 == None and not filled and not parameters.from_one:
+            if L1 == None and not filled and not parameters:
                 lims.append(IntegrationLimit(None, np.sqrt(parameters.X**2+parameters.Y**2), thresh["consts"]))
                 filled = True
+            #print(L1, L2, u)
         lims.sort(key= lambda x: x.sort_radius())
 
-
+    
         
         remove_index = None
         for i, integr in enumerate(lims):
@@ -70,7 +74,11 @@ class ThresholdSolver:
             del lims[remove_index]
         return lims
     def _find_limit_constants(self, converger, parameters):
+        if converger >= 1:
+            return None
         for i, constant in enumerate(self.threshs):
+            if i == 0 and not parameters.from_one:
+                continue
             if parameters.from_one:
                 """
                  This case starts by 1 so first question would be, is bigger than one? 
@@ -85,7 +93,7 @@ class ThresholdSolver:
                     if converger <= constant["thr"] and converger >= self.threshs[i+1]["thr"]:
                         return constant["consts"]
             else:
-                if converger >= constant["thr"] and converger <= self.threshs[i+1]["thr"]:
+                if converger <= constant["thr"] and converger >= self.threshs[i-1]["thr"]:
                     return constant["consts"]
 
 
@@ -106,6 +114,7 @@ class ThresholdSolver:
                 b = -2*u*parameters.sinbeta*parameters.a
                 c = parameters.cosfov**2*parameters.b**2 - parameters.a**2
                 L1, L2 = self._solve_quadratic(a,b,c,u,parameters)
+            #print(L1, L2, u)
             thresh_res.append([L1, L2])
         return thresh_res
     def solve_lims_offset(self, parameters, theta = None):
@@ -123,12 +132,18 @@ class ThresholdSolver:
                 theta = triangle.avg_ang
                 self._solve_lims_offset_theta(theta, thresh_res, parameters, offset_lims[triangle])
         return offset_lims
-    def _offset_array_generator(self, sols, thresh, output_array):
+    def _offset_array_generator(self, sols, thresh, output_array, parameters, converger):
         if len(sols) == 0:
             return
         if len(sols) == 2:
-            output_array.append(IntegrationLimit(None, sols[1], thresh["consts"]))
-            output_array.append(IntegrationLimit(sols[0], None, thresh["consts"]))
+            cte = thresh["thr"]
+            if cte > converger and parameters.from_one:
+                output_array.append(IntegrationLimit(sols[1], None, thresh["consts"]))
+                output_array.append(IntegrationLimit(None, sols[0], thresh["consts"]))
+
+            else:
+                output_array.append(IntegrationLimit(None, sols[1], thresh["consts"]))
+                output_array.append(IntegrationLimit(sols[0], None, thresh["consts"]))
 
         if len(sols) == 4:
             left_sols = sols[0:2]
@@ -141,15 +156,16 @@ class ThresholdSolver:
         output_array.sort(key= lambda x: x.sort_radius())
 
     def _solve_lims_offset_theta(self, theta, thresh_res, parameters, output_array):
-
+        converger = parameters.cosfov/parameters.sinbeta
         filled = False
         costh = np.cos(theta)
         center = -parameters.d*costh # Cute center
+        cond = False
         probe_value = self._eq_offset_lims(center, theta, parameters) if center**2+parameters.d**2+2*parameters.d*center != 0 else None # Lets test the value in center
         if probe_value is not None and probe_value >= -1 and probe_value <=1:
             consts_probe = self._find_limit_constants(probe_value, parameters)
-            output_array.append(IntegrationLimit(center, None, consts_probe))
             output_array.append(IntegrationLimit(None, center, consts_probe))
+            output_array.append(IntegrationLimit(center, None, consts_probe))
         elif not parameters.from_one:
             output_array.append(IntegrationLimit(center, None, self.threshs[0]["consts"]))
             output_array.append(IntegrationLimit(None, center, self.threshs[0]["consts"]))
@@ -183,10 +199,13 @@ class ThresholdSolver:
                 # If probe_value is None then we need to look for its direction, Downtrend or Uptrend. self.from_one gives us that information
                 # If we have a prob_value, then our probe helps us to see their direction
                 sols.sort()
-                self._offset_array_generator(sols, thresh, output_array)
+                self._offset_array_generator(sols, thresh, output_array, parameters, converger)
+        if cond:
+            for lim in output_array:
+                print(lim)
         remove_index = None
         for i, integr in enumerate(output_array):
-            if i == 0 and not parameters.from_one and integr.low is None:
+            if i == 0 and (not parameters.from_one or converger < 1) and integr.low is None:
                 integr.set_low(0)
             else:
                 if integr.high == None:
@@ -213,7 +232,9 @@ class ThresholdSolver:
                 output_array.append(IntegrationLimit(output_array[-1].high, np.sqrt(parameters.X**2+parameters.Y**2), constant))
         if remove_index is not None:
             del output_array[remove_index]
-        
+        if cond:
+            for lim in output_array:
+                print(lim)
         output_array = filter(lambda x: np.abs(x.high - x.low) > 0.001 and x.high > x.low, output_array)
         
 
