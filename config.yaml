@@ -1,6 +1,6 @@
 alpha_t_outside: 90
 alpha_t_inside: 90
-beta_t: 35
+beta_t: 45
 Ap: 0.0001
 eta: 1.5
 fov: 55

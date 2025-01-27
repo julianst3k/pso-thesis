@@ -288,6 +288,7 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
                 float s = distribution(generator);
                 if(std::abs(kk-recv->coordinate[0])<=1.5 && ll>=1.5){
                     float incidencia_wr_rad = incline(kk, wall_pos, ll, recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
+                    std::cout << recv->alpha << "\n";
                     float incidencia_wr = 180.0/pi*incidencia_wr_rad;
                     ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],kk,wall_pos,ll,recv->coordinate[0],recv->coordinate[1],recv->coordinate[2]
         ,dA/70,wall->pw,recv->Ap, recv->eta, trans->alpha, recv->alpha, r, trans->beta, 90-recv->ele,s, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c,

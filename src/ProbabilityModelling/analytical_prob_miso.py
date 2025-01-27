@@ -244,10 +244,10 @@ if __name__ == "__main__":
     #an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
     fov = 45
-    for beta in range(20,80,2):
-        an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, d)
+    for fov in range(20,80,2):
+        an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, 45*np.pi/180, h, r, threshs, d)
         integrator = MonteCarloIntegrator()
-        mont = integrator.miso_integrator(10000, beta = beta, fov = fov)
+        mont = integrator.miso_integrator(10000, beta = 45, fov = fov)
 
         print(an_prob.integrate(), mont, beta)
 
