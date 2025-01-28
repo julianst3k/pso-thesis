@@ -20,6 +20,8 @@
 namespace sh = shadowing;
 namespace pa = parameter_aggregate;
 namespace py = pybind11;
+std::default_random_engine generator;
+std::uniform_real_distribution<float> distribution(-90,90);
 
 struct final_response_wrapper{
     std::unique_ptr<std::vector<float>> final_response;
@@ -60,7 +62,7 @@ pa::SimulationParameters* simulation, sh::WH_Probabilities* wh_coll, ResponseMod
     HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll);
     HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
         case scattering: HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
-        case los: HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);
+        case los: HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);break;
         case nlos: HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2, wh_coll);
     HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
     }
@@ -137,23 +139,20 @@ float dot_product(std::vector<float> v1, std::vector<float> v2){
 
 float incline(float xt, float yt, float zt, float xr, float yr, float zr, float alpha, float beta, bool print = false){
 
-    std::vector<float> path = std::vector<float>{xr-xt, yr-yt, zr-zt};
+    std::vector<float> path = std::vector<float>{xt-xr, yr-yt, zt-zr};
     std::vector<float> vector_normal = norm_vector_recv(alpha, 90-beta);
     std::vector<float> norm = std::vector<float>(path.size());
     std::transform(path.begin(), path.end(), norm.begin(), [](float i)->float {return i*i;});
     float sum = std::sqrt(std::reduce(norm.begin(), norm.end()));
     std::transform(path.begin(), path.end(), norm.begin(), [sum](float i)->float {return i/sum;});
     float dp = dot_product(norm, vector_normal);
-    if(print){
-        std::cout << std::to_string(xt) << " " << std::to_string(xr) << " " << dp << " " << vector_normal[0] << " " << vector_normal[1] << " " <<
-        norm[0] << " " << norm[1] << " " << path[1] << "\n";
-    }
+  
     std::transform(vector_normal.begin(), vector_normal.end(), vector_normal.begin(), [](float i)-> float {return i*0.1;});
-    if(dp>0){
+    if(dp<0){
         return pi;
     }
 
-    return std::acos(-dp);
+    return std::acos(dp);
 }
 
 
@@ -223,21 +222,21 @@ ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float
     std::vector<float> dist_vector_wr;
     
     float dist_vector_norm_tw; float dist_vector_norm_wr; float p1; float p2; float p3; float p4; float dm; float g; std::vector<float> norm_vec_w;
-    dist_vector_tw = vector_distance(tx, ty, tz, wx, wy, wz);
+    dist_vector_tw = vector_distance(wx, wy, wz, tx, ty, tz);
     std::vector<float> dist_vector_tw_neg = std::vector<float>(dist_vector_tw.size());
     std::transform(dist_vector_tw.begin(), dist_vector_tw.end(), dist_vector_tw_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_tw = std::sqrt(std::pow(tx-wx,2)+std::pow(ty-wy,2)+std::pow(tz-wz,2));
-    dist_vector_wr = vector_distance(wx, wy, wz, rx, ry, rz);
+    dist_vector_wr = vector_distance(rx, ry, rz, wx, wy, wz);
     std::vector<float> dist_vector_wr_neg = std::vector<float>(dist_vector_wr.size());
     std::transform(dist_vector_wr.begin(), dist_vector_wr.end(), dist_vector_wr_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_wr = std::sqrt(std::pow(rx-wx,2)+std::pow(ry-wy,2)+std::pow(rz-wz,2));
     norm_vec_t = norm_vector_trans(alphat, betat);
     norm_vec_r = norm_vector_recv(alphar, betar);
-    norm_vec_w = norm_vector_recv(alphaw, betaw);
-    p1 = dot_product(dist_vector_tw, norm_vec_t);
+    norm_vec_w = norm_vector_recv(90+alphaw, 90+betaw);
+    p1 = dot_product(dist_vector_tw, norm_vec_t) > 0 ? dot_product(dist_vector_tw, norm_vec_t) : 0;
     p4 = dot_product(dist_vector_wr_neg, norm_vec_r);
     p2 = dot_product(dist_vector_tw_neg, norm_vec_w);
-    p3 = dot_product(dist_vector_wr, norm_vec_w);
+    p3 = dot_product(dist_vector_wr, norm_vec_w) > 0? dot_product(dist_vector_wr, norm_vec_w) : 0;
     g = gain(eta, incr, incj, fov);
     dm = (dist_vector_norm_wr+dist_vector_norm_tw)/c;
     std::unique_ptr<sh::Shadowing_Parameters_Coll> sh_coll_tw = std::make_unique<sh::Shadowing_Parameters_Coll>();
@@ -250,7 +249,7 @@ ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float
 
     ch::loss_and_time* ret = new ch::loss_and_time();
     ret->loss = poisson_mult*std::abs((m+1)*Ap*Aw*pw*p1*p2*p3*p4*g/(std::pow(dist_vector_norm_tw,3+m)*
-    std::pow(dist_vector_norm_wr,3+m)));
+    std::pow(dist_vector_norm_wr,4)));
     ret->time = dm;
 
     return ret;
@@ -260,10 +259,7 @@ void HLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa:
 pa::SimulationParameters* simulation, std::vector<float>* final_response, sh::WH_Probabilities* wh_coll){
         float* h_vector = new float[140]();
         memset(h_vector, 0, sizeof(h_vector));
-        float sum;
-        for(int j=0; j<140; j++){
-            sum += h_vector[j];
-        }
+
         float incidencia_tr_rad = incline(trans->coordinate[0], trans->coordinate[1], trans->coordinate[2], recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele, false);
         float incidencia_tr = 180/pi*incidencia_tr_rad;
         ch::loss_and_time* hlos = HLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],
@@ -278,21 +274,20 @@ void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa
 pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll){
         int a =1;
         float lx = tunnel->x; float ly = tunnel->y; float lz = tunnel->z;
-        int Nx = lx*5; int Ny = ly*5; int Nz = lz*5;
+        int Nx = lx*10; int Ny = ly*10; int Nz = lz*10;
         float dA = (lz*lx)/(Nx*Nz);
+        float sum = 0;
         for(float kk=0; kk<lx; kk+=lx/Nx){
-            for(float ll=0; ll<ly; ll+=ly/Ny){
-                std::default_random_engine generator;
-                std::uniform_real_distribution<float> distribution(0.0,90);
+            for(float ll=0; ll<lz; ll+=lz/Nz){
                 float r = distribution(generator);
                 float s = distribution(generator);
                 if(std::abs(kk-recv->coordinate[0])<=1.5 && ll>=1.5){
                     float incidencia_wr_rad = incline(kk, wall_pos, ll, recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
-                    std::cout << recv->alpha << "\n";
                     float incidencia_wr = 180.0/pi*incidencia_wr_rad;
-                    ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],kk,wall_pos,ll,recv->coordinate[0],recv->coordinate[1],recv->coordinate[2]
-        ,dA/70,wall->pw,recv->Ap, recv->eta, trans->alpha, recv->alpha, r, trans->beta, 90-recv->ele,s, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c,
+                    ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],kk,wall_pos,ll
+        ,dA,wall->pw,recv->Ap, recv->eta, trans->alpha, recv->alpha, r, trans->beta, 90-recv->ele,s, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c,
         wh_coll);
+                    sum += nhlos->loss;
                     float* h_vector = new float[140]();
                     memset(h_vector, 0, sizeof(h_vector));
                     int index = find_index(simulation->time, nhlos->time);
