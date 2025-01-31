@@ -268,6 +268,7 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, sh::WH
         int index = find_index(simulation->time, hlos->time);
         h_vector[index] = hlos->loss;
         conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+        free(hlos);
         delete [] h_vector;
 }
 void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
@@ -293,6 +294,7 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
                     int index = find_index(simulation->time, nhlos->time);
                     h_vector[index] = nhlos->loss;
                     conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+                    free(nhlos);
                     delete [] h_vector;
                 }
             }
@@ -309,6 +311,7 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
         recv->Ap, recv->eta, trans->alpha, recv->alpha, trans->beta, 90-recv->ele, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t, simulation->c, wh_coll, simulation->scatters);
         int index = find_index(simulation->time, hlos->time);
         h_vector[index] = hlos->loss/N;
+        free(hlos);
     }
     conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
     delete [] h_vector;
@@ -404,7 +407,6 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
     std::vector<std::thread> thread_vec = std::vector<std::thread>(SIZE);
     int i=0;
     for(auto recv : rconfig->receivers){
-        std::cout << i << "\n";
         std::thread ch(channel_subroutine,wall, tconfig, recv, tunnel, simulation, wh_coll, &out_matrix[i]);
         thread_vec[i] = std::move(ch);
         i++;
@@ -413,17 +415,16 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
         thread_vec[k].join();
 
     }
-    float* out_matrix_flat = (float*)malloc(8*16*sizeof(float));
-    int cnt = 0;
+    auto ret = py::array_t<float>({SIZE,4,4}, {4*4*sizeof(float), 4*sizeof(float), sizeof(float)});
+    auto v = ret.mutable_unchecked<3>();
     for(int i=0; i<size; i++){
         for(int j=0; j<4; j++){
             for(int k=0; k<4; k++){
-                out_matrix_flat[cnt] = out_matrix[i][j][k];
-                cnt++;
+                v(i,j,k) = out_matrix[i][j][k];
             }
         }
     }
-    return py::array_t<float>({SIZE,4,4}, {4*4*sizeof(float), 4*sizeof(float), sizeof(float)}, out_matrix_flat);
+    return ret;
 
 }
 py::array_t<float> response_calculation_general(pa::WallParameters* wall, pa::TransmitterAggregate* tconfig, pa::ReceiverConfigurations* rconfig,
@@ -436,7 +437,6 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
     std::vector<std::thread> thread_vec = std::vector<std::thread>(SIZE);
     int i=0;
     for(auto recv : rconfig->receivers){
-        std::cout << i << "\n";
         std::thread ch(response_subroutine, wall, tconfig, recv, tunnel, simulation, wh_coll, mode, &out_matrix[i]);
         thread_vec[i] = std::move(ch);
         
@@ -446,23 +446,25 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
         thread_vec[k].join();
 
     }
-    float* out_matrix_flat = (float*)malloc(8*16*RESP_SIZE*sizeof(float));
-    int cnt = 0;
+    auto ret = py::array_t<float>({SIZE,4,4,RESP_SIZE}, {4*4*RESP_SIZE*sizeof(float), 4*RESP_SIZE*sizeof(float), RESP_SIZE*sizeof(float), sizeof(float)});
+    auto v = ret.mutable_unchecked<4>();
     for(int i=0; i<size; i++){
         for(int j=0; j<4; j++){
             for(int k=0; k<4; k++){
                 std::unique_ptr<std::vector<float>> final_response_vec = std::move(out_matrix[i][j][k]->final_response); 
                 std::vector<float> vec = *(final_response_vec.get());
                 for(int l=0; l<RESP_SIZE; l++){
-                    out_matrix_flat[cnt] = vec[l];
-                    cnt++;
+                    v(i,j,k,l) = vec[l];
                 }
+                delete out_matrix[i][j][k];
             }
         }
     }
-    return py::array_t<float>({SIZE,4,4,RESP_SIZE}, {4*4*RESP_SIZE*sizeof(float), 4*RESP_SIZE*sizeof(float), RESP_SIZE*sizeof(float), sizeof(float)}, out_matrix_flat);
+    
+    return ret;
 
 }
+
 py::array_t<float> response_calculation(pa::WallParameters* wall, pa::TransmitterAggregate* tconfig, pa::ReceiverConfigurations* rconfig,
 pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Probabilities* wh_coll){
     ResponseMode mode = full;

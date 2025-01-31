@@ -26,8 +26,6 @@ class Model(ABC):
         self.wp_bind = self.wall.to_bind()
         self.tag_bind = self.do_transmitter_aggregate()
         rag = self.do_receiver_aggregate()
-        print(self.tag_bind)
-        print(self.bind_recv)
         self.scatt_bind = self.scattering.to_bind()
         self.par_bind = self.sim_param.to_bind(self.scatt_bind)
         self.tunn_bind = self.tunnel.to_bind()
@@ -42,12 +40,10 @@ class Model(ABC):
         self.rags.append(rag)
         for i in range(1, num_rots):
             rot = 360 / (num_rots + 1)
-            self.Receiver_Agg.rotate(0)
+            self.Receiver_Agg.rotate(rot*(i-1))
             rag = self.do_receiver_aggregate()
-            print(rag)
             self.receiver_configurations.pushReceiver(rag)
             self.rags.append(rag)
-        print(self.rags)
         self.shadowing_parameters_bind = self.shadowing_parameters.whp_obj.to_bind(0, 3, 3, 5)
 
         return wp, tag, self.receiver_configurations, par, tunn

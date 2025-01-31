@@ -244,11 +244,14 @@ if __name__ == "__main__":
     #an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
     fov = 45
-    for fov in range(20,80,2):
-        an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, 45*np.pi/180, h, r, threshs, d)
-        integrator = MonteCarloIntegrator()
-        mont = integrator.miso_integrator(10000, beta = 45, fov = fov)
-
-        print(an_prob.integrate(), mont, beta)
-
+    beta_arr = np.linspace(20,80,60)
+    fov_arr = np.linspace(20,80,60)
+    miso_arr = np.zeros((60,60,2))
+    for u, beta in enumerate(beta_arr):
+        for v, fov in enumerate(fov_arr):
+            an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, d)
+            integrator = MonteCarloIntegrator()
+            mont = integrator.simo_integrator(100000, beta = 45, fov = fov)
+            miso_arr[u, v, :] = np.array([an_prob.integrate(), mont])
+    miso_arr.tofile("miso_arr.csv", sep=",")
 

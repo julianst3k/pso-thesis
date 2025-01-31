@@ -3,6 +3,9 @@ from integral_funcs import RectangleIntegrator
 import numpy as np
 import equation_solvers as eq
 from interval import OutOfUnitaryBound
+from montecarlo_prob import MonteCarloIntegrator
+
+
 class AnalyticalProbability(ProbabilityCalculator):
     def __init__(self, X, Y, x_center, y_center, fov, beta, h, r, threshs):
         super().__init__(fov, beta, h, r)
@@ -139,4 +142,15 @@ if __name__ == "__main__":
                {"thr": 0.9, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
     an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov, beta, h, r, threshs)
-    print(an_prob.calculate_probability())
+    beta_arr = np.linspace(20,22,1)
+    fov_arr = np.linspace(78,80,1)    
+    miso_arr = np.zeros((60,60,2))
+    for u, beta in enumerate(beta_arr):
+        for v, fov in enumerate(fov_arr):
+            an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs)
+            integrator = MonteCarloIntegrator()
+            mont = integrator.siso_integrator(10000, beta = beta, fov = fov)
+            miso_arr[u, v, :] = np.array([an_prob.calculate_probability(), mont])
+            an_prob = AnalyticalProbability(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs)
+            print(an_prob.calculate_probability(), mont)
+    #miso_arr.tofile("siso_arr.csv", sep=",")

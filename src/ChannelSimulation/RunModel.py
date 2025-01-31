@@ -59,7 +59,6 @@ class ModelRunResponse(GenericRun):
                 resulting_array = chb.response_calculation(model.wp_bind, model.tag_bind, model.receiver_configurations,
                                         model.tunn_bind, model.par_bind, model.shadowing_parameters_bind)
 
-
             return resulting_array
         else:
             return ValueError('Coordinates Not Stated')

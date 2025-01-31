@@ -65,15 +65,15 @@ class SIMOPairGenerator:
                             high_int.inverse_divide_interval(sol2)
                         else:
                             # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
-                            low_ph = low_int.divide_interval(sol1)
-                            up_ph = high_int.divide_interval(sol1)                            
+                            low_ph = low_int.divide_interval(sol2)
+                            up_ph = high_int.divide_interval(sol2)                            
                     except OutOfUnitaryBound:
                         # sol2+0.01 fuera de la solucion, hay que ver si hay que cortar abajo
                         lower = parameters.eq_base(sol2-0.001, lower_angle, -1, is_offset = offset)
                         upper = parameters.eq_base(sol2-0.001, upper_angle, 1)
                         if lower > upper:
-                            low_int.inverse_divide_interval(sol1)
-                            high_int.inverse_divide_interval(sol1)
+                            low_int.inverse_divide_interval(sol2)
+                            high_int.inverse_divide_interval(sol2)
             except OutOfUnitaryBound:
                 pass
             
