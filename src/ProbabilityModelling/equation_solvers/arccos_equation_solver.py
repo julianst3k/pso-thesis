@@ -146,6 +146,7 @@ class ArccosEquationSolver:
             else:
                 i += 1
         L1, L2 = sols[0], sols[1]
+        
         if L1 is None or L1 < 0:
             ub = parameters.eq_base(lmin+0.001, theta)
             lb = parameters.eq_base(lmin+0.001, theta,neg=-1)

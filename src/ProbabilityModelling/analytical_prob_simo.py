@@ -15,7 +15,8 @@ class AnalyticalSIMO(AnalyticalProbability):
         self._solve_offset()
     def _solve_offset(self):
         base_solver = eq.ArccosEquationSolver(self.threshs)
-        self.simo_intervals = base_solver.solve_base_equations(self, self.alpha, 0)
+        lmin = self.lims[0].low if self.lims[0].const != 1 else self.lims[1].low
+        self.simo_intervals = base_solver.solve_base_equations(self, self.alpha, lmin)
     def do_pairings(self):
         base_interval = Interval(False, False, 0, np.sqrt(self.X**2+self.Y**2))
         self.sol_base_equations = self.divide_by_lims([base_interval], self.lims)
@@ -64,8 +65,8 @@ if __name__ == "__main__":
                {"thr": 0.6, "consts": {"a":-1, "b":np.pi/2}},
                {"thr": 0.85, "consts": {"a":-1.51, "b": 1.85}},
                {"thr": 1, "consts": {"a":-3.2, "b": 3.3}}]
-    beta_arr = np.linspace(20,22,1)
-    fov_arr = np.linspace(78,80,1)
+    beta_arr = np.linspace(20,80,60)
+    fov_arr = np.linspace(20,80,60)
     miso_arr = np.zeros((60,60,2))
 
     for u, beta in enumerate(beta_arr):
@@ -76,5 +77,5 @@ if __name__ == "__main__":
             miso_arr[u, v, :] = np.array([an_prob.integrate(), mont])
             an_prob = AnalyticalSIMO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, alpha)
             print(an_prob.integrate(), mont, beta, fov)
-    miso_arr.tofile("miso_arr.csv", sep=",")
+    miso_arr.tofile("simo_arr.csv", sep=",")
 

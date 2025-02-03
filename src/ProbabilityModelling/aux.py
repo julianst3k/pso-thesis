@@ -33,7 +33,7 @@ class RecTriangle:
     def get_area(self):
         return self.x*self.y/2
     def __str__(self):
-        return f'Triangle: {self.x}, {self.y}, {self.ang_crt}'
+        return f'Triangle: {self.x}, {self.y}, {self.ang_crt}, {self.ang_low}, {self.ang_high}'
     def get_Dn(self):
         Dn = self.x if self.orientation == Orientation.HORIZONTAL else self.y
         return Dn 

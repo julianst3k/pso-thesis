@@ -49,8 +49,10 @@ class SIMOPairGenerator:
         tol = 1e-4
         low_ph = None
         up_ph = None
-        sol2 = sol2 if sol2 >= self.llow and sol2 <= self.lhigh else None
-        sol1 = sol1 if sol1 >= self.llow and sol1 <= self.lhigh else None
+        if sol2 is not None:
+            sol2 = sol2 if sol2 >= self.llow and sol2 <= self.lhigh else None
+        if sol1 is not None:
+            sol1 = sol1 if sol1 >= self.llow and sol1 <= self.lhigh else None
         if sol2 is not None:
             try:
                 lower = parameters.eq_base(sol2, lower_angle, -1, is_offset = offset)
@@ -61,8 +63,8 @@ class SIMOPairGenerator:
                         lower = parameters.eq_base(sol2+0.001, lower_angle, -1, is_offset = offset)
                         upper = parameters.eq_base(sol2+0.001, upper_angle, 1)
                         if lower < upper:
-                            low_int.inverse_divide_interval(sol2)
-                            high_int.inverse_divide_interval(sol2)
+                            low_int.inverse_divided_interval(sol2)
+                            high_int.inverse_divided_interval(sol2)
                         else:
                             # Cortar la parte de arriba, pero mantenemos el intervalo para el caso de sol1
                             low_ph = low_int.divide_interval(sol2)
@@ -72,8 +74,8 @@ class SIMOPairGenerator:
                         lower = parameters.eq_base(sol2-0.001, lower_angle, -1, is_offset = offset)
                         upper = parameters.eq_base(sol2-0.001, upper_angle, 1)
                         if lower > upper:
-                            low_int.inverse_divide_interval(sol2)
-                            high_int.inverse_divide_interval(sol2)
+                            low_int.inverse_divided_interval(sol2)
+                            high_int.inverse_divided_interval(sol2)
             except OutOfUnitaryBound:
                 pass
             
@@ -89,11 +91,11 @@ class SIMOPairGenerator:
                         if lower < upper:
                             # Cortar la parte de abajo
                             if up_ph is not None:
-                                up_ph.inverse_divide_interval(sol1)
-                                low_ph.inverse_divide_interval(sol1)
+                                up_ph.inverse_divided_interval(sol1)
+                                low_ph.inverse_divided_interval(sol1)
                             else:
-                                low_int.inverse_divide_interval(sol1)
-                                high_int.inverse_divide_interval(sol1)
+                                low_int.inverse_divided_interval(sol1)
+                                high_int.inverse_divided_interval(sol1)
                         else:
                             low_int.divide_interval(sol1)
                             high_int.divide_interval(sol1)                            
@@ -102,8 +104,8 @@ class SIMOPairGenerator:
                         lower = parameters.eq_base(sol1-0.001, lower_angle, -1, is_offset = offset)
                         upper = parameters.eq_base(sol1-0.001, upper_angle, 1)
                         if lower > upper:
-                            low_int.inverse_divide_interval(sol1)
-                            high_int.inverse_divide_interval(sol1)
+                            low_int.inverse_divided_interval(sol1)
+                            high_int.inverse_divided_interval(sol1)
             except OutOfUnitaryBound:
                 pass
         if up_ph is None:
