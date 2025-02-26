@@ -59,7 +59,12 @@ class MISOOffsetIntegrator:
             delta = b*(1+1/2*ua(minimum,avg_t)**2/b**2)-np.sqrt(ua(minimum,avg_t)**2+b**2)
             integr -= delta/2*(xt**2-xb**2)*(tt-tb)
             integr += lambda_under_one_wrap(xt, xb, tt, tb)
+            if np.abs(triang.avg_ang-1.13) < 0.01:
+                print(f"Integral half-first step is {integr}")
             integr += lambda_under_two_wrap(xt, xb, tt, tb)
+            if np.abs(triang.avg_ang-1.13) < 0.01:
+                print(f"Integral before a step is {lambda_under_two_wrap(xt, xb, tt, tb)}")
+
         elif xt > x_u and xb < x_u: # [xb, x_u] bajo b, [x_u, xt] sobre b
             integr += lambda_under_one_wrap(x_u, xb, tt, tb)
             integr += lambda_under_two_wrap(x_u, xb, tt, tb)
@@ -75,10 +80,18 @@ class MISOOffsetIntegrator:
         sinbeta = self.params.sinbeta
         integr *= cosfov/sinbeta
         pre_a = integr*self.consts["a"]
+        aconst = self.consts["a"]
+        if np.abs(triang.avg_ang-1.13) < 0.01:
+            print(f"The integral first step is : {integr*aconst}")
         aux_integr = lambda_one_a_constant(xt, tt)-lambda_one_a_constant(xt,tb)-lambda_one_a_constant(xb, tt)+lambda_one_a_constant(xb, tb)
         integr += -a*(aux_integr)/(b*sinbeta)
         integr *= self.consts["a"]
+        if np.abs(triang.avg_ang-1.13) < 0.01:
+            print(f"The integral second stepis: {integr}")
         integr += self.consts["b"]/2*(xt**2-xb**2)*(tt-tb)
+        if np.abs(triang.avg_ang-1.13) < 0.01:
+            print(f"The integral is: {integr}")
+
         return integr
     def _acos_lambda_wrapper(self, N = 10):
         lambda_over_one, lambda_over_two = self.acos_lambda_over_b(N) # f(x,t), f(xt, xb, t)
@@ -155,46 +168,7 @@ class MISOOffsetIntegrator:
                 if set_sign == -1 and np.abs(t-np.pi) < 0.001:
                     tanh_term *= set_sign
                 return logd_term + sinusoidal_terms + linear_terms + tanh_term/3
-                """
-                if x+d*np.cos(t) < 0:
-                    u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
-                    base = 0
-                    base = 1/3*(np.sin(t)**3*np.log(-d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
-                    summ = 0
-                    for n in range(1,N):
-                        summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
-                    print(f"Summ with {t} in Approx x < dcos: {summ}")
-                    return summ + base
-                    
-                else:
-                    if x == 0: 
-                        # En este caso, log(x) = 0, y d/x = inf,
-                        # Sin embargo, la solucion real es log(dcos(x)) => usar simplemente el caso base de arriba
-                        u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
-                        base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))+(np.log(u)-np.sin(t)-np.sin(t)**3/3)) 
-                        return base
-                    if np.abs(d*np.cos(t)/x-1) < 0.1:
-                        ## En este caso las aproximaciones que hay debajo dan mucho error
-                        base = 0
-                        first_term = ((x-1)*np.sin(t)**3/3+d/8*t-np.sin(4*t)/32*d)
-                        second_term = -((x-1)**2*np.sin(t)**3/3+2*(x-1)*(d/8*t-np.sin(4*t)/32*d)+d**2*(self.f_cos(t, 4)-self.f_cos(t, 8)))/2  
-                        summ = first_term + second_term
-                        print(f"Summ with {t} in Approx around 1: {summ}")
-                    elif x > d*np.cos(t):
-
-                        base = np.sin(t)**3/3*np.log(x)
-                        summ = 0
-                        for n in range(1,N):
-                            summ += (d/x)**n*(-1)**(n)/(n*(n+2))*(np.cos(t)**(n+2)*np.sin(t)-self.f_cos(t, n+3))
-                        print(f"Summ with {t} in Approx x>dcos: {summ}")
-                    else:
-                        u = (np.sin(t/2)+np.cos(t/2))/(np.cos(t/2)-np.sin(t/2))
-                        base = 1/3*(np.sin(t)**3*np.log(d*np.cos(t))-(-np.log(np.abs(u))+np.sin(t)+(np.sin(t)**3)/3)) 
-                        summ = 0
-                        for n in range(1,N):
-                            summ += (x/d)**n*(-1)**(n-1)/n*(self.f_cos(t, 1-n)-self.f_cos(t, 3-n))
-                return summ + base
-                """
+                
             set_sign = 1
             try:
                 if cos_expansion(x, d, tt)/cos_expansion(x, d, tb) < 0 and np.abs(cos_expansion(x, d, tt))>0.1:
@@ -505,60 +479,137 @@ class NonOriginIntegrator:
     def integral_even(self, Dn, theta_bot, theta_top, theta_crt, n):
         reverse = self.reverse
         max_Dn = Dn/np.cos(theta_top)
-        if self.ub > max_Dn:
-            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
-            return integral, theta_top
-        elif self.ub < Dn:
-            integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
-            return integral, None
+        if self.lb > max_Dn:
+            
+            return 0, theta_top
+        elif self.lb < Dn:
+            if self.ub > max_Dn:
+                integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
+
+                return integral, theta_top
+            elif self.ub < Dn:
+                integral = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
+                return integral, None
+            elif self.lb < Dn:
+                theta_mid = np.arccos(Dn/self.ub)
+                if theta_mid > theta_top:         
+                    theta_mid = theta_top
+                cosine_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
+                linear_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
+                return cosine_int+linear_int, theta_mid
         else:
+            theta_mid_t = np.arccos(Dn/self.lb)
+            if theta_mid_t < theta_bot:
+                theta_mid_t = theta_bot
+            else:
+                theta_bot = theta_mid_t
             theta_mid = np.arccos(Dn/self.ub)
-            if theta_mid < theta_top:
+            if theta_mid > theta_top:         
                 theta_mid = theta_top
             cosine_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_cosine(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
             linear_int = 2/(Dn**2*np.tan(theta_crt))*self.integral_linear(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
-
             return cosine_int+linear_int, theta_mid
+
+
     def integral_odd(self, Dn, theta_bot, theta_top, theta_crt, n):
         reverse = self.reverse
         max_Dn = Dn/np.sin(theta_bot)
-        if self.ub > max_Dn:
-            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
-            return integral, theta_bot
-        elif self.ub < Dn:
-            integral = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
-            return integral, None
+        #print(n, self.lb, max_Dn)
+        if self.lb > max_Dn:
+            return 0, theta_top
+        elif self.lb < Dn:
+            if self.ub > max_Dn:
+                integral = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
+                return integral, theta_bot
+            if self.ub < Dn:
+                integral = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_top, n, reverse)*1/np.pi
+                return integral, None
+            else:
+                theta_mid = np.arcsin(Dn/self.ub)
+                if self.lb != 0 and self.lb > Dn:
+                    theta_mid_c = np.arccos(Dn/self.lb)
+                if theta_mid < theta_bot:
+                    theta_mid = theta_bot
+                sine_int = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
+                
+                linear_int = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
+                return sine_int+linear_int, theta_mid
         else:
+            theta_mid_b = np.arcsin(Dn/self.lb)
+            if theta_mid_b > theta_top:
+                theta_mid_b = theta_top
+            else:
+                theta_top = theta_mid_b
             theta_mid = np.arcsin(Dn/self.ub)
-            if theta_mid > theta_top:
-                theta_mid = theta_top
-            
+            if theta_mid < theta_bot:
+                theta_mid = theta_bot
             sine_int = 2/(Dn**2*cotan(theta_crt))*self.integral_sine(Dn, theta_mid, theta_top, n, reverse)*1/np.pi
             linear_int = 2/(Dn**2*cotan(theta_crt))*self.integral_linear(Dn, theta_bot, theta_mid, n, reverse)*1/np.pi
-
             return sine_int+linear_int, theta_mid
+
+
 
     def integral_cosine(self, Dn, theta_bot, theta_top, n, reverse = False):
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
         sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_cosine(Dn, reverse)
         inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
-        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
-        #print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
-        #print(f"Innter sum {inner_sum}")
-        #print(f"Outer sum {outer_sum}, Terms: \n - 1 {(sum_int_one(theta_top)-sum_int_one(theta_bot))+-sum_int_a(self.lb)*(theta_top-theta_bot)+sum_int_two(theta_bot, theta_top)} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}\n. b: {self.params.b}, Dn: {Dn}")
+        #int_two_mc = self.int_two_mc_cosine(theta_bot, theta_top, Dn)
+        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot,theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
+        if n == 100:
+            print(f"Number {n}", self.params.cosfov, self.params.sinbeta, sum_int_one(theta_top), sum_int_one(theta_bot))
+            print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
+            print(f"Innter sum {inner_sum}")
+            print(f"Outer sum {outer_sum}, Terms: \n - 1 {(sum_int_one(theta_top)-sum_int_one(theta_bot))} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}\n. b: {self.params.b}, Dn: {Dn}")
+            print(int_two_mc)
+
         return outer_sum+inner_sum
     def integral_sine(self, Dn, theta_bot, theta_top, n, reverse = False):
 
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
         sum_int_one, sum_int_two, sum_int_three, sum_int_four = self.integral_lambdas_sine(Dn, reverse)
         inner_sum = (-sum_int_a(self.lb)-sum_int_b(self.lb)-sum_int_c(self.lb))*(theta_top-theta_bot)
-        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot, theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
-        #print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
-        #print(f"Innter sum {inner_sum}")
-        #print(f"Outer sum {outer_sum}, Terms: \n - 1 {sum_int_one(theta_top)-sum_int_one(theta_bot)} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}")
-       
+        #int_two_mc = self.int_two_mc_sine(theta_bot, theta_top, Dn)
+        outer_sum = sum_int_one(theta_top)-sum_int_one(theta_bot)+sum_int_two(theta_bot,theta_top)+sum_int_three(theta_top)-sum_int_three(theta_bot)+sum_int_four(theta_top)-sum_int_four(theta_bot)
+        if n == 100:
+            print(f"Number {n}")
+            print(f"The integral from {self.lb} to {self.ub}, with max radius {Dn}, max angle {theta_top} and min angle {theta_bot} amounts to {outer_sum+inner_sum}")
+            print(f"Innter sum {inner_sum}")
+            print(f"Outer sum {outer_sum}, Terms: \n - 1 {sum_int_one(theta_top)-sum_int_one(theta_bot)} \n - 2 {sum_int_two(theta_bot, theta_top)} \n - 3 {sum_int_three(theta_top)-sum_int_three(theta_bot)} \n - 4 {sum_int_four(theta_top)-sum_int_four(theta_bot)}")
+            print(int_two_mc)
+ 
         return outer_sum+inner_sum
-    
+    def int_two_mc_sine(self, tb, tt, Dn):
+        cosfov = self.params.cosfov
+        sinbeta = self.params.sinbeta
+        a = self.consts["a"]
+
+        prod = cosfov/sinbeta*a/2
+        summ = 0
+        b = self.params.b
+        N = 10000
+        tx = (tt-tb)/10000
+        for i in range(N):
+            tu = tb + tx*(i+1)
+            tl = tb + tx*i
+            summ += (np.log(np.sqrt(Dn**2/np.sin(tu)**2+b**2)+Dn/np.sin(tu))*b**2+np.log(np.sqrt(Dn**2/np.sin(tl)**2+b**2)+Dn/np.sin(tl))*b**2)*(tu-tl)/2
+        return summ*prod
+    def int_two_mc_cosine(self, tb, tt, Dn):
+        cosfov = self.params.cosfov
+        sinbeta = self.params.sinbeta
+        a = self.consts["a"]
+
+        prod = cosfov/sinbeta*a/2
+        N = 10000
+        b = self.params.b
+        summ = 0
+        tx = (tt-tb)/10000
+
+        for i in range(N):
+            tu = tb + tx*(i+1)
+            tl = tb + tx*i
+            summ += (np.log(np.sqrt(Dn**2/np.cos(tu)**2+b**2)+Dn/np.cos(tu))*b**2+np.log(np.sqrt(Dn**2/np.cos(tl)**2+b**2)+Dn/np.cos(tl))*b**2)*(tu-tl)/2
+        return summ*prod
+
     def integral_linear(self, Dn, theta_bot, theta_top, n, reverse = False):
         sum_int_a, sum_int_b, sum_int_c = self.integral_lambdas_linear(reverse)
         sum_int = sum_int_a(self.ub)-sum_int_a(self.lb)+sum_int_b(self.ub)-sum_int_b(self.lb)+sum_int_c(self.ub)-sum_int_c(self.lb)
@@ -624,7 +675,7 @@ class NonOriginIntegrator:
         sum_int_three = lambda t: -ap/sinbeta*Dn*np.log(np.sin(t/2)/np.cos(t/2))*a
         sum_int_four = lambda t: -(b+alpha/2-pi_ct)*Dn**2/2*cotan(t)
         return sum_int_one, sum_int_two, sum_int_three, sum_int_four
-    def sinh_int_cos(self, tb, tt, Dn, max_order = 10, debug = False):
+    def sinh_int_cos(self, tb, tt, Dn, max_order = 20, debug = False):
         """
         Tested: Yes, small error if Dn/b < 1, but nothing to do ...
         integral of arcsinh(Dn/(bsin(x))) 
@@ -661,7 +712,7 @@ class NonOriginIntegrator:
         #print(f"Integral Arcsinh {summation*multiplier}")
 
         return summation*multiplier
-    def sinh_int_sin(self, tb, tt, Dn, max_order = 10, debug = False):
+    def sinh_int_sin(self, tb, tt, Dn, max_order = 20, debug = False):
         """
         Tested: Yes, small error if Dn/b < 1, but nothing to do ...
         integral of arcsinh(Dn/(bsin(x))) 
@@ -856,6 +907,7 @@ class RectangleIntegrator:
                 int_sum += integr*tri.get_area()/(X*Y)
                 if crt is not None:
                     tri.change_ang(crt)
+                #print(int_sum, i)
             return int_sum
         return _integrator_wrapper   
     @_integrate
@@ -898,8 +950,8 @@ class TriangleIntegrator:
                 triang_subtot += integral
                 tot_int += integral
             integrator = MonteCarloIntegrator()
-#            print(triang_subtot/triang.get_area(), mont, triang.avg_ang, triang.max_r)
-            integrator = MonteCarloIntegrator()
+            mont = integrator.miso_integrator_rand_r(1000, triang.max_r, triang.ang_low, triang.ang_high, 25, 60)
+            print(triang_subtot/triang.get_area(), mont, triang.avg_ang, triang.max_r)
             area += triang.get_area()
         return tot_int/area
     def __call__(self, list_of_lims, parameters):
@@ -925,11 +977,11 @@ class TriangleIntegrator:
         if np.abs(interv_bot.ub-interv_bot.lb) < 1e-4 or np.abs(interv_top.ub-interv_top.lb) < 1e-4:
             return 0
         integral = self._pivoted_skipper(interv_top, interv_bot, triang, parameters)
-        #if triang.avg_ang > 5.17 and triang.avg_ang < 5.18:
-         #   print(f"Integral with {interv_bot} to {interv_top}: {integral}, Top: {interv_top.integrate_ub(triang, parameters)/(2*np.pi)}, Bot: {interv_bot.integrate_lb(triang, parameters)/(2*np.pi)}")
-            #tot, arc, atan = interv_bot.riemman_integral(triang, parameters)
-            #print(f"Riemman Integral: {tot/(2*np.pi), arc, atan}")
-            #print(f"Angle top: {triang.ang_high}, Angle bot: {triang.ang_low}")
+        if np.abs(triang.avg_ang-1.13) < 0.01:
+            print(f"Integral with {interv_bot} to {interv_top}: {integral}, Top: {interv_top.integrate_ub(triang, parameters)/(2*np.pi)}, Bot: {interv_bot.integrate_lb(triang, parameters)/(2*np.pi)}")
+            tot, arc, atan = interv_bot.riemman_integral(triang, parameters)
+            print(f"Riemman Integral: {tot/(2*np.pi), arc, atan}")
+            print(f"Angle top: {triang.ang_high}, Angle bot: {triang.ang_low}")
 
         return integral
 
@@ -943,7 +995,6 @@ class TriangleIntegrator:
             aux = r_min
             r_min = r_max
             r_max = aux
-
         if interv_top.ub > r_max and interv_top.lb < r_min:
             ub = interv_top.ub
             interv_top.ub = r_min 

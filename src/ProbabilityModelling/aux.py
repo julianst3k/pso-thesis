@@ -182,9 +182,15 @@ class ProbabilityCalculator(ABC):
         self.cosfov = np.cos(fov)
 
 
-
-
-
+class CycleObject:
+    def __init__(self):
+        self.arr = []
+    def check_cycle(self, sol):
+        return sol in self.arr
+    def add_val(self, sol):
+        self.arr.append(sol)
+    def reset(self):
+        self.arr = []
 class NewtonRaphson:
     def __init__(self, Llow, Lhigh, func, dfunc, parameters):
         self.llow = Llow+0.001
@@ -209,12 +215,19 @@ class NewtonRaphson:
         tol = 1e-4
         if xl - xr < 0.01:
             return False, False
+        r_anti_cycle_constant = 1
+        l_anti_cycle_constant = 1
+        left_obj = CycleObject()
+        left_obj.add_val(xl)
+        right_obj = CycleObject()
+        right_obj.add_val(xr)
+        cycles = 0
         while keep_xr or keep_xl:
             if keep_xr:
                 xr_func, xr_dfunc = self.obtain_func_and_d(xr, theta, interval_base, interval_offset, is_lb)
                 try:
                     if keep_xr:
-                        xr -= xr_func/xr_dfunc
+                        xr -= r_anti_cycle_constant*xr_func/xr_dfunc
                 except ZeroDivisionError:
                     keep_xr = False
                 if xr < self.llow or xr > self.lhigh or abs(xr_func) < tol or np.abs(xr_dfunc) < tol:
@@ -222,7 +235,7 @@ class NewtonRaphson:
             if keep_xl:
                 xl_func, xl_dfunc = self.obtain_func_and_d(xl, theta, interval_base, interval_offset, is_lb)
                 try:
-                    xl -= xl_func/xl_dfunc
+                    xl -= l_anti_cycle_constant*xl_func/xl_dfunc
                 except ZeroDivisionError:
                     keep_xl = False
 
@@ -230,8 +243,19 @@ class NewtonRaphson:
                     keep_xl = False
             #if debug:
                 #print(xr, xl)
+            if keep_xr and right_obj.check_cycle(xr):
+                r_anti_cycle_constant *= 0.99
+                right_obj.reset()
+            if keep_xl and left_obj.check_cycle(xl):
+                l_anti_cycle_constant *= 0.99
+                left_obj.reset()
+            left_obj.add_val(xl)
+            right_obj.add_val(xr)
             solved_r = abs(xr_func) < tol and xr >= self.llow and xr <= self.lhigh
             solved_l = abs(xl_func) < tol and xl >= self.llow and xl <= self.lhigh
+            cycles += 1
+            if cycles > 1000:
+                break
         if not solved_r:
             xr = False
         if not solved_l:

@@ -10,6 +10,7 @@ class IntervalOffsetSolver:
     def __init__(self):
         ...
     def base_intervals_solver(self, L1, L2, theta, parameters):
+
         maxr = np.sqrt(parameters.X**2+parameters.Y**2)
         try:
             if L1.is_wrapper:
@@ -43,12 +44,16 @@ class IntervalOffsetSolver:
                         else:
                             interv = [Interval(True, False, 0, L2.sol), Interval(False, False, L2.sol, maxr)]
                 else:
+
                     if (L1.ub or L1.lb):
                         if L1.ub:
-                            interv = [Interval(True, False, 0, L1.sol), Interval(True, True, L1.sol, maxr)]
+                            bool_off_ub, val = self._get_base_bool(L1.sol, theta, parameters, 1)
+                            interv = [Interval(True, not bool_off_ub, 0, L1.sol), Interval(True, bool_off_ub, L1.sol, maxr)]
 
                         else:
-                            interv = [Interval(True, False, 0, L1.sol), Interval(False, False, L1.sol, maxr)]
+                            bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)
+                            interv = [Interval(not bool_off_lb, False, 0, L1.sol), Interval(bool_off_lb, False, L1.sol, maxr)]
+
 
                     else:
                         bool_off_lb, val = self._get_base_bool(L1.sol, theta, parameters, -1)

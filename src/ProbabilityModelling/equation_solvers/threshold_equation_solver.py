@@ -7,7 +7,7 @@ class ThresholdSolver:
         self.threshs = thresh
     def solve_equations(self, parameters):
         lims = []
-        if parameters.cosfov*parameters.b-parameters.a > 0:
+        if parameters.cosfov*parameters.b-parameters.a > 0 and self.threshs[0]["thr"] != 1:
             parameters.from_one = True
             self.threshs = self.threshs[::-1]
             parameters.threshs = self.threshs
@@ -42,8 +42,6 @@ class ThresholdSolver:
             #print(L1, L2, u)
         lims.sort(key= lambda x: x.sort_radius())
 
-    
-        
         remove_index = None
         for i, integr in enumerate(lims):
             if i == 0 and not parameters.from_one:

@@ -46,6 +46,7 @@ class AnalyticalSIMO(AnalyticalProbability):
                 integral += val_down
             else:
                 integral += integrator.pair_integrator(pair[0].lb, pair[1].ub, pair[1].consts, self, False)
+            #print(integral, pair[0])
         return integral
 
 if __name__ == "__main__":
@@ -77,5 +78,6 @@ if __name__ == "__main__":
             miso_arr[u, v, :] = np.array([an_prob.integrate(), mont])
             an_prob = AnalyticalSIMO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, alpha)
             print(an_prob.integrate(), mont, beta, fov)
+        
     miso_arr.tofile("simo_arr.csv", sep=",")
 

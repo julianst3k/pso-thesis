@@ -29,6 +29,8 @@ pa::SimulationParameters* simulation, sh::WH_Probabilities* wh_coll, std::vector
 
 void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll);
+void HNLos_Vector_Out(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll);
 
 void HLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation, std::vector<float>* final_response, sh::WH_Probabilities* wh_coll);
@@ -42,6 +44,8 @@ ch::loss_and_time* HScatter(float tx, float ty, float tz, float rx, float ry, fl
     float betat, float betar, int m, float fov, float X, float Y, float t, float c, sh::WH_Probabilities* wh_coll, pa::ScatterParameters* scatters);
 
 void HScatter_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll);
+void HScatter_Vector_Out(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll);
 
 

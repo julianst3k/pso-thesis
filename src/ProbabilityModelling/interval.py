@@ -109,6 +109,8 @@ class FunctionalInterval(Interval):
                 return (-1)**(is_lb)*pi_const_integral
             acos_integral = integrator.acos_integrator(triang)
             atan_integral = integrator.atan_integral(triang)
+            if np.abs(triang.avg_ang-1.13) < 0.01:
+                print(f"Analytical Integral {acos_integral}, {atan_integral}")
             #print(acos_integral, atan_integral, self.riemman_integral(triang, parameters), self.lb, self.ub, triang.ang_high, triang.ang_low)
             pi_const_integral = integrator.pi_const_integrator(triang)
             if offset:

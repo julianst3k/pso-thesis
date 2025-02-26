@@ -203,13 +203,10 @@ class AnalyticalMISO(AnalyticalProbability):
             #if triangle.avg_ang > 3.15 and triangle.avg_ang < 3.16:
             pairs = self._lower_upper_pairs_generator(self.base_offset_pairs[triangle], triangle.avg_ang)
             pairs_dict[triangle] = pairs
-
-            
-
-                
-
-
-                
+            if np.abs(triangle.avg_ang-1.13) < 0.01:
+                for pair in pairs:
+                    print(pair[0])
+                    print(pair[1])
         integral = integrator(pairs_dict, self)
         return integral
 
@@ -244,14 +241,16 @@ if __name__ == "__main__":
     #an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov, beta, h, r, threshs, d)
     #print([triang.max_r for triang in an_prob.rect])
     fov = 45
-    beta_arr = np.linspace(20,80,60)
-    fov_arr = np.linspace(20,80,60)
+    beta_arr = np.linspace(60,80,1)
+    fov_arr = np.linspace(25,80,1)
     miso_arr = np.zeros((60,60,2))
     for u, beta in enumerate(beta_arr):
         for v, fov in enumerate(fov_arr):
             an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, d)
             integrator = MonteCarloIntegrator()
-            mont = integrator.simo_integrator(100000, beta = 45, fov = fov)
+            mont = integrator.miso_integrator_rand(100000, beta = beta, fov = fov)
             miso_arr[u, v, :] = np.array([an_prob.integrate(), mont])
+            an_prob = AnalyticalMISO(X, Y, x_c, y_c, fov*np.pi/180, beta*np.pi/180, h, r, threshs, d)
+            print(an_prob.integrate(), mont, beta, fov)
     miso_arr.tofile("miso_arr.csv", sep=",")
 

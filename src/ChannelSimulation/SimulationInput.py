@@ -40,7 +40,7 @@ class Model(ABC):
         self.rags.append(rag)
         for i in range(1, num_rots):
             rot = 360 / (num_rots + 1)
-            self.Receiver_Agg.rotate(rot*(i-1))
+            self.Receiver_Agg.rotate(rot)
             rag = self.do_receiver_aggregate()
             self.receiver_configurations.pushReceiver(rag)
             self.rags.append(rag)

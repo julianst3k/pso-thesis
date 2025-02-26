@@ -57,16 +57,23 @@ std::vector<float> led_pd_response(pa::WallParameters* wall, pa::TransmitterPara
 pa::SimulationParameters* simulation, sh::WH_Probabilities* wh_coll, ResponseMode mode){
     std::vector<float> final_response(simulation->time.size()+simulation->h_led.size()-1);
     switch(mode){
-        case full: HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);
-    HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2, wh_coll);
-    HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll);
-    HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
-        case scattering: HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
-        case los: HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);break;
-        case nlos: HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2, wh_coll);
-    HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); break;
+        case full: 
+            HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);
+            HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2, wh_coll);
+            HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll);
+            HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); 
+            break;
+        case scattering: 
+            HScatter_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); 
+            break;
+        case los: 
+            HLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, wh_coll);
+            break;
+        case nlos: 
+            HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 0.2, wh_coll);
+            HNLos_Vector(wall, trans, recv, tunnel, simulation, &final_response, 2.8, wh_coll); 
+            break;
     }
-
     return final_response;
 }
 
@@ -139,19 +146,20 @@ float dot_product(std::vector<float> v1, std::vector<float> v2){
 
 float incline(float xt, float yt, float zt, float xr, float yr, float zr, float alpha, float beta, bool print = false){
 
-    std::vector<float> path = std::vector<float>{xt-xr, yr-yt, zt-zr};
+    std::vector<float> path = std::vector<float>{xt-xr, yt-yr, zt-zr};
     std::vector<float> vector_normal = norm_vector_recv(alpha, 90-beta);
     std::vector<float> norm = std::vector<float>(path.size());
     std::transform(path.begin(), path.end(), norm.begin(), [](float i)->float {return i*i;});
     float sum = std::sqrt(std::reduce(norm.begin(), norm.end()));
     std::transform(path.begin(), path.end(), norm.begin(), [sum](float i)->float {return i/sum;});
     float dp = dot_product(norm, vector_normal);
-  
-    std::transform(vector_normal.begin(), vector_normal.end(), vector_normal.begin(), [](float i)-> float {return i*0.1;});
+
     if(dp<0){
         return pi;
     }
-
+    //if(alpha==30){
+    //    std::cout << "Path: [" << path[0] << "," << path[1] << "," << path[2] << "], Normal: [" << vector_normal[0] << "," << vector_normal[1] << "," << vector_normal[2] << "] Angle: " << std::acos(dp) << "\n"; 
+    //}
     return std::acos(dp);
 }
 
@@ -222,11 +230,11 @@ ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float
     std::vector<float> dist_vector_wr;
     
     float dist_vector_norm_tw; float dist_vector_norm_wr; float p1; float p2; float p3; float p4; float dm; float g; std::vector<float> norm_vec_w;
-    dist_vector_tw = vector_distance(wx, wy, wz, tx, ty, tz);
+    dist_vector_tw = vector_distance(tx, ty, tz, wx, wy, wz);
     std::vector<float> dist_vector_tw_neg = std::vector<float>(dist_vector_tw.size());
     std::transform(dist_vector_tw.begin(), dist_vector_tw.end(), dist_vector_tw_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_tw = std::sqrt(std::pow(tx-wx,2)+std::pow(ty-wy,2)+std::pow(tz-wz,2));
-    dist_vector_wr = vector_distance(rx, ry, rz, wx, wy, wz);
+    dist_vector_wr = vector_distance(wx, wy, wz, rx, ry, rz);
     std::vector<float> dist_vector_wr_neg = std::vector<float>(dist_vector_wr.size());
     std::transform(dist_vector_wr.begin(), dist_vector_wr.end(), dist_vector_wr_neg.begin(), [](float i) -> float { return -i;});
     dist_vector_norm_wr = std::sqrt(std::pow(rx-wx,2)+std::pow(ry-wy,2)+std::pow(rz-wz,2));
@@ -239,6 +247,9 @@ ch::loss_and_time* HNLos(float tx, float ty, float tz, float rx, float ry, float
     p3 = dot_product(dist_vector_wr, norm_vec_w) > 0? dot_product(dist_vector_wr, norm_vec_w) : 0;
     g = gain(eta, incr, incj, fov);
     dm = (dist_vector_norm_wr+dist_vector_norm_tw)/c;
+
+
+
     std::unique_ptr<sh::Shadowing_Parameters_Coll> sh_coll_tw = std::make_unique<sh::Shadowing_Parameters_Coll>();
     sh_coll_tw->create_collection(tx, ty, tz, wx, wy, wz, wh_coll);
     std::unique_ptr<sh::Shadowing_Parameters_Coll> sh_coll_wr = std::make_unique<sh::Shadowing_Parameters_Coll>();
@@ -271,6 +282,43 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, sh::WH
         free(hlos);
         delete [] h_vector;
 }
+void HNLos_Vector_Out(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll){
+        int a =1;
+        float lx = tunnel->x; float ly = tunnel->y; float lz = tunnel->z;
+        int Nx = lx*10; int Ny = ly*10; int Nz = lz*10;
+        float dA = (lz*lx)/(Nx*Nz);
+        float sum = 0;
+        float total = 0;
+        for(float kk=0; kk<lx; kk+=lx/Nx){
+            for(float ll=0; ll<lz; ll+=lz/Nz){
+                float r = distribution(generator);
+                float s = distribution(generator);
+                if(std::abs(kk-recv->coordinate[0])<=1.5 && ll>=1.5){
+                    float incidencia_wr_rad = incline(kk, wall_pos, ll, recv->coordinate[0], recv->coordinate[1], recv->coordinate[2], recv->alpha, recv->ele);
+                    float incidencia_wr = 180.0/pi*incidencia_wr_rad;
+                    if(incidencia_wr < 55){
+                        std::cout << "Incidencia: " << incidencia_wr << " Coords Wall: [" << kk << "," << wall_pos << "," << ll << "] Coords Recv" << recv->coordinate[0] << "," << recv->coordinate[1] << "," << recv->coordinate[2] << "] \n";
+                    }
+                    ch::loss_and_time* nhlos = HNLos(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],kk,wall_pos,ll
+        ,dA,wall->pw,recv->Ap, recv->eta, trans->alpha, recv->alpha, r, trans->beta, 90-recv->ele,s, incidencia_wr_rad, incidencia_wr, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t,simulation->c,
+        wh_coll);
+                    sum += nhlos->loss;
+                    float* h_vector = new float[140]();
+                    memset(h_vector, 0, sizeof(h_vector));
+                    int index = find_index(simulation->time, nhlos->time);
+                    h_vector[index] = nhlos->loss;
+                    if(incidencia_wr < 55){
+                        std::cout << "The index is " << index << " and the loss is " << nhlos->loss << "\n";
+                    }
+                    total += nhlos->loss;
+                    conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+                    free(nhlos);
+                    delete [] h_vector;
+                }
+            }
+        }
+}
 void HNLos_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
 pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll){
         int a =1;
@@ -278,6 +326,7 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
         int Nx = lx*10; int Ny = ly*10; int Nz = lz*10;
         float dA = (lz*lx)/(Nx*Nz);
         float sum = 0;
+        float total = 0;
         for(float kk=0; kk<lx; kk+=lx/Nx){
             for(float ll=0; ll<lz; ll+=lz/Nz){
                 float r = distribution(generator);
@@ -293,12 +342,16 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
                     memset(h_vector, 0, sizeof(h_vector));
                     int index = find_index(simulation->time, nhlos->time);
                     h_vector[index] = nhlos->loss;
+                    total += nhlos->loss;
                     conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
                     free(nhlos);
                     delete [] h_vector;
                 }
             }
         }
+    //if(total==0){
+    //    std::cout << "[" << recv->coordinate[0] << "," << recv->coordinate[1] << "," << recv->coordinate[2] << "," << "] Orientation:" << recv->alpha << " Wall Position" << wall_pos << "\n";
+    //}
 }
 
 void HScatter_Vector(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
@@ -310,10 +363,27 @@ pa::SimulationParameters* simulation, std::vector<float>* final_response, float 
         ch::loss_and_time* hlos = HScatter(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],
         recv->Ap, recv->eta, trans->alpha, recv->alpha, trans->beta, 90-recv->ele, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t, simulation->c, wh_coll, simulation->scatters);
         int index = find_index(simulation->time, hlos->time);
-        h_vector[index] = hlos->loss/N;
+        h_vector[index] += hlos->loss/N;
         free(hlos);
     }
     conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+    delete [] h_vector;
+
+}
+void HScatter_Vector_Out(pa::WallParameters* wall, pa::TransmitterParameters* trans, pa::ReceiverParameters* recv, pa::TunnelParameters* tunnel,
+pa::SimulationParameters* simulation, std::vector<float>* final_response, float wall_pos, sh::WH_Probabilities* wh_coll){
+    float* h_vector = new float[140]();
+    memset(h_vector, 0, sizeof(h_vector));
+    float N = simulation->scatters->n;
+    for(int i=0; i<N; i++){
+        ch::loss_and_time* hlos = HScatter(trans->coordinate[0],trans->coordinate[1],trans->coordinate[2],recv->coordinate[0],recv->coordinate[1],recv->coordinate[2],
+        recv->Ap, recv->eta, trans->alpha, recv->alpha, trans->beta, 90-recv->ele, trans->m, recv->fov, tunnel->x, tunnel->y, simulation->t, simulation->c, wh_coll, simulation->scatters);
+        int index = find_index(simulation->time, hlos->time);
+        h_vector[index] += hlos->loss/N;
+        free(hlos);
+    }
+    conv(final_response, &h_vector, &simulation->h_led, simulation->time.size());
+    std::cout << (*final_response)[RESP_SIZE-10] << "Index :" << h_vector[25] << "\n";
     delete [] h_vector;
 
 }
@@ -375,6 +445,7 @@ pa::SimulationParameters* simulation, sh::WH_Probabilities* wh_coll, ResponseMod
     for(auto pd: recv->receivers){
         for(auto led: trans->transmitters){
             std::unique_ptr<std::vector<float>> final_response = std::make_unique<std::vector<float>>(led_pd_response(wall, led, pd, tunnel, simulation, wh_coll, mode));
+
             (*matrix)[i][j] = new final_response_wrapper();
 
             (*matrix)[i][j]->final_response = std::move(final_response);
@@ -432,7 +503,7 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
     const size_t size = rconfig->receivers.size();
     std::srand(std::time(nullptr)); 
 
-    std::cout << std::to_string(size);
+    //std::cout << std::to_string(size);
     std::vector<std::vector<std::vector<final_response_wrapper*>>> out_matrix(SIZE, std::vector<std::vector<final_response_wrapper*>>(4, std::vector<final_response_wrapper*>(4)));
     std::vector<std::thread> thread_vec = std::vector<std::thread>(SIZE);
     int i=0;
@@ -455,6 +526,9 @@ pa::TunnelParameters* tunnel, pa::SimulationParameters* simulation, sh::WH_Proba
                 std::vector<float> vec = *(final_response_vec.get());
                 for(int l=0; l<RESP_SIZE; l++){
                     v(i,j,k,l) = vec[l];
+                    if(vec[l]==0 && l==RESP_SIZE-1){
+                        // std::cout << "Zero value at " << j << "\n"; 
+                    }
                 }
                 delete out_matrix[i][j][k];
             }

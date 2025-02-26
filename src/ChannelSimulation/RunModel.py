@@ -41,10 +41,11 @@ class ModelRunResponse(GenericRun):
     def update(self, coords):
         self.base_model.generate_receiver(coords)
         self.coords_generated = True
-    def __call__(self, restype = ""):
+    def __call__(self, restype = "", omit_rotations = False):
         if self.coords_generated:
             model = self.base_model
-            self.base_model.create_pybind_rotations(8)
+            if not omit_rotations:
+                self.base_model.create_pybind_rotations(8)
 
             if restype == "los":
                 resulting_array = chb.response_calculation_los(model.wp_bind, model.tag_bind, model.receiver_configurations,
@@ -72,6 +73,6 @@ class ModelRunWrapper(GenericRun):
             self.model_runner = ModelRunResponse(config_params)
     def update(self, coords):
         self.model_runner.update(coords)
-    def __call__(self, restype=""):
-        return self.model_runner(restype)
+    def __call__(self, restype="", omit_rotations = False):
+        return self.model_runner(restype, omit_rotations)
 

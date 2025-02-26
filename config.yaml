@@ -4,13 +4,13 @@ beta_t: 45
 Ap: 0.0001
 eta: 1.5
 fov: 55
-beta_r: 30
+beta_r: 60
 reflection_coef: 0.6
 p: 0.1
 g: 0.72
 f: 0.5
 gamma: 0.017
-n: 40
+n: 120
 N_Mie: 2e6
 wavelength: 500e-9
 particle_size: 10e-6

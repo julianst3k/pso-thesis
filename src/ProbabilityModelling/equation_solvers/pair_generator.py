@@ -263,7 +263,7 @@ class PairTreeGenerator:
                 res_lb = self.pair_solver._lb_min_finder(self.constant_interval, self.pairs)
                 intervals_merged = self.int_gen.interval_finder_merger(res_ub, res_lb)
                 res_intervs = self.pair_solver._check_centers_list(intervals_merged)
-               
+                res_third = res_intervs.extend(self.pair_solver._max_min_finder(self.pairs)) 
         else:
             """
                      [lbd, min(ub, ubd)] + [max(lb*, lbd), ubd]
@@ -292,7 +292,7 @@ class PairTreeGenerator:
                 res_lb = self.pair_solver._lb_min_finder(self.pairs.get_interval(), self.pairs)
                 intervals_merged = self.int_gen.interval_finder_merger(res_ub, res_lb)
                 res_intervs = self.pair_solver._check_centers_list(intervals_merged)
-
+                
         else:
             """
                 [max(lb,lbd),min(ub,ubd)]
@@ -311,7 +311,7 @@ class PairSolver:
         self.llow = pair_generator.llow
         self.lhigh = pair_generator.lhigh
         self.int_gen = PairIntervalGenerator()
-    def _solve_max_equation(self, low, high, interv_one, interv_two):
+    def _solve_max_equation(self, low, high, interv_one, interv_two, is_lb = True):
         """
         Output would be:
 
@@ -321,7 +321,6 @@ class PairSolver:
         Two, One, breaking point: Re-do the intervals with One from br to high
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
-        is_lb = True
         s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb, debug = True)
         func_val = self.func(low+0.001, self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
@@ -345,7 +344,7 @@ class PairSolver:
                 else:
                     return interv_two, interv_one, sol
 
-    def _solve_min_equation(self, low, high, interv_one, interv_two):
+    def _solve_min_equation(self, low, high, interv_one, interv_two, is_lb = False):
         """
         Output would be:
 
@@ -355,7 +354,6 @@ class PairSolver:
         Two, One, breaking point: Re-do the intervals with One from br to high
         """
         newton = NewtonRaphson(low, high, self.func, self.dfunc, self.parameters)
-        is_lb = False
         s1, s2 = newton.solve(self.theta, interv_one, interv_two, is_lb)
         func_val = self.func(low+0.001, self.theta, interv_one, interv_two, is_lb)
         if s1 and s2:
@@ -518,6 +516,20 @@ class PairSolver:
         unf_res_intervs = [self._check_max_min(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub), mini, upper_bound.push_functional_interval(False).set_lb_ub(max(mini.lb, upper_bound.lb), min(mini.ub, upper_bound.ub))) for mini in lower_set]
         res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
         return res_intervs
+    def _max_min_finder(self, pair):
+        base = pair[0].push_functional_interval(False)
+        offset = pair[1].push_functional_interval(False)
+        max_interval_one, max_interval_two, breaking_point = self._solve_max_equation(self.llow, self.lhigh, base, offset, is_lb = False)
+        higher_set = self._breaking_point_insertion(max_interval_one, max_interval_two, breaking_point, base, offset)
+        base = pair[0].push_functional_interval(True)
+        offset = pair[1].push_functional_interval(True)
+        min_interval_one, min_interval_two, breaking_point = self._solve_min_equation(self.llow, self.lhigh, base, offset, is_lb = True)
+        lower_set = self._breaking_point_insertion(min_interval_one, min_interval_two, breaking_point, base, offset)
+        pair_filtered = self.parameters.interval_pairing(lower_set, higher_set)
+        unf_res_intervs = [self._check_max_min(u[0].lb, u[0].ub, u[0], u[1]) for u in pair_filtered]
+        res_intervs = self.int_gen.pair_filtering(unf_res_intervs)
+        return res_intervs
+
     def _check_centers_list(self, interval_list):
         output_array = []
         for interv in interval_list:

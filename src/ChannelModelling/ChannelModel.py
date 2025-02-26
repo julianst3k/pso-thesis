@@ -67,11 +67,13 @@ class ReceiverParameters:
     def calculate_coord(self, rot=0):
         self.angle += rot
         angle = self.angle
+        self.angle = self.angle%360
         self.coordinate = [self.center[0] + self.r * np.cos(np.deg2rad(angle)) * np.sin(np.deg2rad(self.ele)),
                            self.center[1] + self.r * np.sin(np.deg2rad(angle)) * np.sin(np.deg2rad(self.ele)),
                            self.center[2] + self.r * np.cos(np.deg2rad(self.ele)),
                            angle,
                            90 - self.ele]
+        
 
     def to_bind(self):
         return chb.ReceiverParameters(self.Ap, self.eta, self.fov, self.angle, self.ele, np.array(self.center),
